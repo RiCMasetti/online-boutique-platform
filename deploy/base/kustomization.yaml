@@ -1,0 +1,65 @@
+# Base comune a dev e prod: base upstream (kustomize/base) più hardening.
+# Qui non ci sono namespace, repliche o host: stanno negli overlay.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../kustomize/base
+  - redis-serviceaccount.yaml
+patches:
+  # Nessun servizio usa l'API Kubernetes (verificato: nessun client K8s nelle dipendenze),
+  # quindi il token del service account non serve. Si disattiva sia sul ServiceAccount
+  # sia sul pod (il valore del pod prevale).
+  - target:
+      kind: ServiceAccount
+    patch: |-
+      - op: add
+        path: /automountServiceAccountToken
+        value: false
+  # Hardening dei pod: la base ha già runAsNonRoot, readOnlyRootFilesystem, drop ALL e
+  # allowPrivilegeEscalation=false. Aggiungiamo il profilo seccomp di default del runtime.
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/automountServiceAccountToken
+        value: false
+      - op: add
+        path: /spec/template/spec/securityContext/seccompProfile
+        value:
+          type: RuntimeDefault
+  # redis-cart: ServiceAccount dedicato e password (Secret `redis-cart-auth`, fornito
+  # da ciascun overlay e cifrato con SOPS).
+  - target:
+      kind: Deployment
+      name: redis-cart
+    patch: |-
+      - op: add
+        path: /spec/template/spec/serviceAccountName
+        value: redis-cart
+      - op: add
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: redis-cart-auth
+                key: password
+      - op: add
+        path: /spec/template/spec/containers/0/args
+        value: ["--requirepass", "$(REDIS_PASSWORD)"]
+  # cartservice: la password viaggia nella stringa di connessione di StackExchange.Redis.
+  # REDIS_PASSWORD deve precedere REDIS_ADDR perché $(VAR) funzioni.
+  - target:
+      kind: Deployment
+      name: cartservice
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env
+        value:
+          - name: REDIS_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: redis-cart-auth
+                key: password
+          - name: REDIS_ADDR
+            value: "redis-cart:6379,password=$(REDIS_PASSWORD)"

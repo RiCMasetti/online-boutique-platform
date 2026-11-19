@@ -1,0 +1,32 @@
+# WORKAROUND per nodi arm64 (Apple Silicon): le immagini upstream sono solo amd64 e girano
+# emulate (ADR 0002). Con le immagini multi-arch (fase 6) si elimina questa cartella e la
+# riga `components:` negli overlay.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  # Le probe gRPC upstream hanno timeout di 1 s e nessun ritardo iniziale: sotto emulazione
+  # JVM, .NET, Node e Python rispondono più lentamente e vengono uccisi (exit 137).
+  - target:
+      kind: Deployment
+      name: adservice|cartservice|currencyservice|emailservice|recommendationservice
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/timeoutSeconds
+        value: 5
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/initialDelaySeconds
+        value: 10
+      - op: add
+        path: /spec/template/spec/containers/0/livenessProbe/timeoutSeconds
+        value: 5
+      - op: add
+        path: /spec/template/spec/containers/0/livenessProbe/initialDelaySeconds
+        value: 60
+  # Sotto emulazione questi servizi superano il limite upstream di 128Mi (OOMKilled).
+  - target:
+      kind: Deployment
+      name: cartservice|currencyservice|paymentservice
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: boutique-prod
+  labels:
+    # Pod Security Admission: i pod che violano il profilo "restricted" vengono rifiutati.
+    # Verificato in dry-run: tutti i pod dell'app lo rispettano già.
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

@@ -1,0 +1,31 @@
+# NetworkPolicy: component upstream (deny-all + una policy per servizio) più una
+# restrizione dell'ingress del frontend.
+# Limite noto: le policy upstream hanno `egress: [{}]`, quindi l'uscita non è limitata.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+components:
+  - ../../../kustomize/components/network-policies
+patches:
+  # Upstream il frontend accetta traffico da qualunque origine (`ingress: [{}]`).
+  # Lo limitiamo a Traefik (ingress controller di k3s) e al loadgenerator.
+  # Quando arriverà Prometheus servirà aggiungere il suo namespace (fase 5-7).
+  - target:
+      kind: NetworkPolicy
+      name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/ingress
+        value:
+          - from:
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: kube-system
+                podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: traefik
+              - podSelector:
+                  matchLabels:
+                    app: loadgenerator
+            ports:
+              - port: 8080
+                protocol: TCP

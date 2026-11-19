@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Secret
+metadata:
+    name: redis-cart-auth
+type: Opaque
+stringData:
+    password: ENC[AES256_GCM,data:Mycf+MECbCVZRXZUlgPDIK/kjvTWwHvyzvp0A4fnQAmt6u1jXqDVTbNsa5ivDKcn,iv:rr5cSI+Wexgwsg6RxTuiT7MCZaTACcizUVtsuEKwXSE=,tag:4WJ+qcwf00FS/IdHXS0VVA==,type:str]
+sops:
+    age:
+        - enc: |
+            -----BEGIN AGE ENCRYPTED FILE-----
+            YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBRWjVvUm4wZHdRZkx4SEF4
+            RHpGWWU4eHE0TzkxWE1nT29adXY4MFo3MDFjCmN2NlBYZ3pCSW5icTlkYml2K0kz
+            SWtrZnE2Q2dHdG5NeW5EQ3E4WWpkN0EKLS0tIHZqMkxVbzJZV0EzQjlWTDFxbGp1
+            aDg1V1ppWG04K3Q5Q0x6bU5SZk9LQzgKMd5Ay2818ogV0Nd1/cPW0GY/nHJAvDin
+            mnKUvyEoJy6wuZHqcn7WBXurTEDQQJQAZ73ertZFq4I8qMvx47EHHg==
+            -----END AGE ENCRYPTED FILE-----
+          recipient: age1k7eurz4u6lzyj37z0c4hyld57e3htr77t7mtl66cpdrh2hpvxayq2us7wa
+    encrypted_regex: ^(data|stringData)$
+    lastmodified: "2026-11-19T13:51:55Z"
+    mac: ENC[AES256_GCM,data:wbJFTweYo9eUl9c7TxHaTdsps6SazOCEeaDjbNpt/sJOne88fsr0zXX/GS14/th1wgNs/UN8Pzu3uEgfBNdiLE3Ajv7tKkouSSeRckyVyOiXfsNQ7TWKrcO3+OcCsGc8KfdBAYBdUxo/tLsoCBePHjFryPCLZrlVE+pNBLOcY0k=,iv:cTyNbQGR2R++QNSMRxkpIW8ZXKjUKMNjxZLHvKj4i40=,tag:HrSe4Mp4V26VOWLyF5laGg==,type:str]
+    version: 3.13.3

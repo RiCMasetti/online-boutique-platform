@@ -27,7 +27,7 @@ Restano esclusi `redis:alpine` e l'immagine `busybox` dell'init container, già 
 
 - **Manutenzione:** undici immagini invece di una; di fatto un fork delle immagini upstream. La licenza (Apache 2.0) lo consente. Va dichiarato nella documentazione finale.
 - **Tempo di build:** la prima build è lunga, soprattutto per Java e .NET. Da misurare in fase 6. Costruire arm64 con QEMU in CI è lento: da verificare nella documentazione di GitHub se i runner arm64 sono disponibili e gratuiti per un fork pubblico, prima di contarci.
-- **Visibilità su GHCR:** i pacchetti devono essere pubblici perché chiunque li scarichi senza login. Da verificare e impostare alla prima push.
+- **Visibilità su GHCR:** i pacchetti devono essere pubblici perché chiunque possa scaricarli senza login. Da verificare e impostare alla prima push.
 - **Demo senza rete:** il piano B della fase 11 scarica le immagini sulla macchina di demo e le importa con `k3d image import`, che usa l'architettura locale.
 
 ## Transizione

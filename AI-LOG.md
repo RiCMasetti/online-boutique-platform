@@ -87,6 +87,28 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-06 | 1 | analisi | Claude Code | Mappa dei servizi e `docs/architecture.md` (diagramma, tabelle servizio/protocollo/dipendenze, punti critici) | mod. | Lettura statica di `kustomize/base`, `protos/demo.proto`, codice di frontend, checkout, cart, recommendation e policy di rete. Vedi sotto: ha corretto il piano. **Da fare da me:** rileggere `architecture.md` confrontandolo con i manifest e spuntare la lista "Da verificare a runtime" in fase 2 |
 | AI-07 | 1 | operations | Claude Code | Fase 2: `cluster-up.sh`, overlay dev minimo, `smoke-test.sh`, diagnosi dei pod in crash al primo deploy | mod. | Eseguito su k3d: 12 pod `1/1 Running`, smoke test (checkout incluso) superato. Diagnosi con `describe`, `logs --previous`, `kubectl top` e `crictl inspecti`: immagini upstream solo amd64 su nodo arm64 (probe in timeout) e poi OOMKilled su cart/currency/payment. Vedi `docs/architecture.md` §10. Workaround nell'overlay dev, da rimuovere con le immagini multi-arch. Il primo `cluster-up.sh` falliva perché Traefik viene installato da k3s dopo il nodo Ready: corretto con attesa esplicita. **Da fare da me:** rileggere script e overlay prima del commit |
 | AI-08 | 1 | governance | Claude Code | Confronto delle opzioni per le immagini solo amd64 e scrittura di `docs/adr/0002-immagini-multi-arch.md` | acc. | L'AI ha proposto tre opzioni (build multi-arch di tutto, solo frontend, Rosetta) e ha raccomandato la prima più un tentativo con Rosetta. **Decisione mia:** build multi-arch di tutti i servizi, per mantenere la compatibilità in ambiente di sviluppo; l'esperimento Rosetta è stato scartato. Verificato sul repo: i Dockerfile usano `TARGETARCH`; la VM è QEMU senza Rosetta. Non verificato: runner arm64 gratuiti per il fork pubblico e visibilità di default dei pacchetti GHCR (rimandati alla fase 6) |
+| AI-09 | 3 | implementazione | Claude Code | Fase 3: base e overlay `dev`/`prod`, hardening, NetworkPolicy, Secret Redis con SOPS+age, `apply-local.sh` e `netpol-test.sh`, `docs/security.md` | mod. | Eseguito su k3d: dev (12 pod) e prod (13 pod) attivi, smoke test superato in entrambi, `kubeconform` valido (Secret cifrato escluso). Dettagli e correzioni sotto |
+
+**AI-09, esito (2026-11-19):**
+
+- *Verificato prima di scrivere:* nessun servizio usa l'API Kubernetes (quindi `automountServiceAccountToken: false` è sicuro); la base ha già `runAsNonRoot`, `readOnlyRootFilesystem`, `drop ALL`, `allowPrivilegeEscalation: false`; manca solo `seccompProfile`, aggiunto. Pod Security `restricted` provato in dry-run lato server prima di attivarlo.
+- *Errori miei corretti lungo la strada:*
+  1. In prod restavano un ServiceAccount e una NetworkPolicy orfani del loadgenerator (il component upstream toglie solo il Deployment): rimossi con patch.
+  2. `netpol-test.sh` contava come "bloccato" qualunque errore, anche un pod non creato: i casi negativi passavano per il motivo sbagliato. Corretto: il pod deve stampare `rc=N`, altrimenti è un errore. Altri due difetti nello stesso script: `kubectl run --overrides` sostituisce l'intero container (comando incluso) e `run --rm -i` perde l'output per una race.
+  3. In prod il test usava la label `loadgenerator`, la cui policy non esiste: il pod era bloccato in uscita dal `deny-all`. Sorgente dei casi negativi cambiata in `emailservice`.
+- *Controlli negativi sulle policy:* senza la policy di cartservice i percorsi leciti si bloccano; senza `deny-all` e senza quella policy, `emailservice` e un pod dell'altro ambiente raggiungono cartservice. Il test fallisce nei due casi, quindi rileva i cambi in entrambe le direzioni.
+- *Segreti:* chiave age generata in locale (`~/.config/sops/age/keys.txt`, permessi 600, fuori dal repo); password casuali cifrate senza mai passare dall'output; `.sops.yaml` contiene solo la chiave pubblica. Nessun valore segreto è entrato in prompt, log o repo.
+- *Limiti:* l'uscita di rete non è limitata (upstream `egress: [{}]`); `kustomize build` include il Secret cifrato, quindi `kubectl apply -k` non è utilizzabile finché non c'è Flux (da qui `apply-local.sh`); la decifratura da parte di Flux dopo il build non è ancora provata (fase 4); la dichiarazione "k3s non cifra i Secret a riposo" non è verificata. Elenco completo in `docs/security.md`.
+
+**AI-09, verifica (da spuntare da me prima del commit della fase 3):**
+
+- [ ] Letto `deploy/base/kustomization.yaml` e i due component (`network-policies`, `arm64-workaround`).
+- [ ] Letto `deploy/overlays/{dev,prod}/kustomization.yaml` e controllato che le differenze dev/prod siano quelle volute (repliche, loadgenerator, risorse frontend, host).
+- [ ] Letti `scripts/apply-local.sh` e `scripts/netpol-test.sh` riga per riga (in particolare il filtro dei documenti `sops:` e la costruzione dell'`--overrides`).
+- [ ] Controllato che nessun file `*.enc.yaml` contenga valori in chiaro e che `~/.config/sops/age/keys.txt` non sia nel repo (`git ls-files | grep -i key`, `gitleaks`).
+- [ ] Fatto un backup della chiave privata age fuori dal repo.
+- [ ] Letto `docs/security.md` e confermato che i limiti residui siano completi e onesti.
+- [ ] Prova da zero: `k3d cluster delete boutique`, `scripts/cluster-up.sh`, `scripts/apply-local.sh dev`, `scripts/apply-local.sh prod`, smoke test e `netpol-test.sh` su entrambi.
 
 **AI-07, verifica (spuntato in base alla mia conferma del 2026-11-19: letti i due script e l'overlay, provato tutto da zero):**
 
