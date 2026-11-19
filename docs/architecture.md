@@ -185,19 +185,38 @@ Conseguenza per la fase 3: le policy upstream limitano il traffico **in ingresso
 | Risorse | Circa 1,6 vCPU e 1,4 GiB di requests per ambiente, più il loadgenerator. Due ambienti (dev e prod) nello stesso cluster raddoppiano il conto, più lo stack Prometheus. | Fase 3: ridurre repliche e risorse in `dev`; verificare la RAM di Docker |
 | Immagini | La base usa `us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/*:v0.10.7`, immagini pubbliche upstream. `redis:alpine` non ha un tag fissato. | Fase 3: fissare i tag con il component `container-images-tag`; fase 5-6: immagine propria su GHCR |
 | `frontend-external` | Service `LoadBalancer` non necessario con Traefik. | Fase 2-3 |
-| Log JSON | Non confermati a runtime. `cartservice` e `loadgenerator` non risultano configurati per JSON. | Fase 2/5: `kubectl logs` |
+| Log JSON | Confermato a runtime: 9 servizi su 11. `cartservice` e `loadgenerator` no. | Documentare nel runbook |
+| Architettura CPU | Le immagini upstream sono solo **amd64**. Su Apple Silicon girano emulate: avvio lento, probe in timeout, più memoria (vedi sezione 10). | Overlay dev (workaround); build multi-arch in fasi 5-6 |
 
 ## 8. Da verificare a runtime
 
-Cose dedotte dal codice che vanno confermate con il cluster acceso (fase 2 in poi):
+Cose dedotte dal codice. Quelle spuntate sono state osservate nel cluster k3d (fase 2, 2026-11-19); le altre restano da provare.
 
-- [ ] Il frontend risulta `Ready` con un backend assente (client gRPC lazy).
-- [ ] Variabile `*_SERVICE_ADDR` sbagliata: nessun crash, errori 500 e log gRPC. Variabile rimossa: `CrashLoopBackOff` (frontend e checkout).
-- [ ] Con Redis fermo, il cartservice resta `Ready` e le chiamate falliscono con `FailedPrecondition`.
-- [ ] Le NetworkPolicy upstream sono applicate da k3s: un pod non autorizzato non raggiunge il servizio protetto.
-- [ ] Formato dei log di ogni servizio (JSON o no).
-- [ ] Consumo reale di CPU e memoria rispetto ai *requests* della base.
+- [x] Il frontend risulta `Ready` con backend assenti: è rimasto `1/1` per oltre 10 minuti mentre email, recommendation e altri erano in `CrashLoopBackOff` o non pronti.
+- [ ] Variabile `*_SERVICE_ADDR` sbagliata: nessun crash, errori 500 e log gRPC. Variabile rimossa: `CrashLoopBackOff` (frontend e checkout). _Fase 8._
+- [ ] Con Redis fermo, il cartservice resta `Ready` e le chiamate falliscono con `FailedPrecondition`. _Fase 8._
+- [ ] Le NetworkPolicy upstream sono applicate da k3s: un pod non autorizzato non raggiunge il servizio protetto. _Fase 3._
+- [x] Formato dei log: JSON in 9 servizi su 11 (frontend, checkout, productcatalog, shipping, currency, payment, email, recommendation, ad). **Non JSON:** cartservice (testo semplice, es. `GetCartAsync called with userId=...`) e loadgenerator.
+- [x] Consumo reale: vedi [sezione 10](#10-osservazioni-dal-primo-deploy-fase-2).
 
 ## 9. Come ho validato questa analisi
 
 La mappa iniziale è stata prodotta con l'AI e poi riletta riga per riga su manifest, `.proto` e codice (vedi `AI-LOG.md`, voce AI-06). Il documento descrive ciò che è stato effettivamente letto. Dove il codice contraddiceva un'assunzione del piano (scenario 2 della fase 8) lo si dice esplicitamente nella sezione 4.
+
+## 10. Osservazioni dal primo deploy (fase 2)
+
+Il deploy della base upstream su k3d (arm64, VM con 4 CPU e 10 GB) non è partito al primo tentativo. Cause, in ordine di scoperta:
+
+1. **Immagini solo amd64.** `crictl inspecti` mostra `architecture: amd64` per tutte le immagini `online-boutique-ci/...:v0.10.7`, mentre il nodo è arm64. Il registry di rilascio `us-docker.pkg.dev/google-samples/...` risponde 403 in accesso anonimo, quindi non offre un'alternativa multi-arch. Sintomo: `CrashLoopBackOff` con exit 137 su emailservice e recommendationservice, e riavvii su adservice, cartservice e currencyservice. Evento: `Liveness probe failed: ... within 1s: context deadline exceeded`. Nessun log, perché il processo veniva ucciso prima di scrivere. Le probe gRPC upstream hanno timeout di 1 s e nessun ritardo iniziale.
+2. **OOMKilled.** Dopo aver rilassato le probe, cartservice, currencyservice e paymentservice sono stati terminati per memoria (`Last State: OOMKilled`, exit 137). Il limite upstream è 128Mi e `kubectl top` mostrava già 121-126Mi. Probabile causa: l'emulazione aumenta il consumo (ipotesi, non misurata a parità di architettura).
+3. **Effetto a catena.** L'init container del loadgenerator ha ricevuto 500 dal frontend per 12 tentativi e si è fermato (`Init:Error`) finché i backend non si sono stabilizzati.
+
+Correzioni applicate in `deploy/overlays/dev/kustomization.yaml`, marcate come provvisorie:
+
+- timeout delle probe a 5 s, ritardo iniziale di 10 s (readiness) e 60 s (liveness) per adservice, cartservice, currencyservice, emailservice e recommendationservice;
+- limite di memoria a 256Mi per cartservice, currencyservice e paymentservice;
+- rimozione di `frontend-external` con il component upstream `non-public-frontend` (su k3d un secondo Service `LoadBalancer` sulla porta 80 entrerebbe in conflitto con Traefik).
+
+Consumi osservati a regime, con il loadgenerator attivo: adservice 225Mi, cartservice 169Mi, currencyservice 127Mi, paymentservice 125Mi, recommendationservice 67Mi, emailservice 73Mi, frontend 42Mi, checkout 36Mi, productcatalog 35Mi, shipping 32Mi, redis 11Mi, loadgenerator 86Mi (501m di CPU, vicino al limite).
+
+**Conseguenze per le fasi successive.** Il build dell'immagine custom (fase 5) e la CI (fase 6) devono produrre immagini **multi-arch** (`linux/amd64` e `linux/arm64`), altrimenti il frontend custom girerà emulato in locale. Gli altri servizi restano amd64 emulati finché non si ricostruiscono: va deciso se costruirli tutti o tenere il workaround.

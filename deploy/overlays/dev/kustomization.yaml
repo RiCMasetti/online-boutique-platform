@@ -1,0 +1,44 @@
+# Overlay dev, versione minima della fase 2: base upstream + namespace + Ingress.
+# Repliche, risorse, hardening e tag delle immagini arrivano nella fase 3.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: boutique-dev
+resources:
+  - namespace.yaml
+  - ../../../kustomize/base
+  - ingress.yaml
+components:
+  # Rimuove il Service frontend-external (LoadBalancer): su k3d entrerebbe in conflitto
+  # con Traefik sulla porta 80. L'accesso passa dall'Ingress.
+  - ../../../kustomize/components/non-public-frontend
+
+# WORKAROUND per Apple Silicon (arm64): le immagini upstream sono solo amd64 e girano
+# emulate, quindi JVM, .NET, Node e Python impiegano molto più di 1 s (default delle probe
+# gRPC) a rispondere e vengono uccisi dalla liveness probe (exit 137).
+# Da rimuovere quando le immagini saranno costruite multi-arch (fasi 5-6).
+patches:
+  - target:
+      kind: Deployment
+      name: adservice|cartservice|currencyservice|emailservice|recommendationservice
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/timeoutSeconds
+        value: 5
+      - op: add
+        path: /spec/template/spec/containers/0/readinessProbe/initialDelaySeconds
+        value: 10
+      - op: add
+        path: /spec/template/spec/containers/0/livenessProbe/timeoutSeconds
+        value: 5
+      - op: add
+        path: /spec/template/spec/containers/0/livenessProbe/initialDelaySeconds
+        value: 60
+  # Sotto emulazione amd64 questi servizi superano il limite upstream di 128Mi (OOMKilled,
+  # exit 137). Valore provvisorio: le risorse vere si definiscono nella fase 3.
+  - target:
+      kind: Deployment
+      name: cartservice|currencyservice|paymentservice
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: 256Mi

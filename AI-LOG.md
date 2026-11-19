@@ -85,6 +85,15 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-04 | 1 | operations | Claude Code | Rimuovere i workflow upstream legati a GCP, estendere `.gitignore`, aggiungere pre-commit con gitleaks, scansionare la history | acc. | Letti i workflow prima di rimuoverli (credenziali GCP di upstream, quindi inutilizzabili su un fork); YAML residui caricati con Ruby; `gitleaks git` su 2775 commit senza leak; `pre-commit run --all-files` passato. Commit `5b171834` |
 | AI-05 | 1 | analisi | Claude Code | Verificare i punti aperti di AI-01: component upstream e log JSON per servizio | mod. | Vedi sotto: ha corretto un'assunzione errata del piano |
 | AI-06 | 1 | analisi | Claude Code | Mappa dei servizi e `docs/architecture.md` (diagramma, tabelle servizio/protocollo/dipendenze, punti critici) | mod. | Lettura statica di `kustomize/base`, `protos/demo.proto`, codice di frontend, checkout, cart, recommendation e policy di rete. Vedi sotto: ha corretto il piano. **Da fare da me:** rileggere `architecture.md` confrontandolo con i manifest e spuntare la lista "Da verificare a runtime" in fase 2 |
+| AI-07 | 1 | operations | Claude Code | Fase 2: `cluster-up.sh`, overlay dev minimo, `smoke-test.sh`, diagnosi dei pod in crash al primo deploy | mod. | Eseguito su k3d: 12 pod `1/1 Running`, smoke test (checkout incluso) superato. Diagnosi con `describe`, `logs --previous`, `kubectl top` e `crictl inspecti`: immagini upstream solo amd64 su nodo arm64 (probe in timeout) e poi OOMKilled su cart/currency/payment. Vedi `docs/architecture.md` §10. Workaround nell'overlay dev, da rimuovere con le immagini multi-arch. Il primo `cluster-up.sh` falliva perché Traefik viene installato da k3s dopo il nodo Ready: corretto con attesa esplicita. **Da fare da me:** rileggere script e overlay prima del commit |
+
+**AI-07, verifica (spuntato in base alla mia conferma del 2026-11-19: letti i due script e l'overlay, provato tutto da zero):**
+
+- [x] Letto `scripts/cluster-up.sh` riga per riga.
+- [x] Letto `scripts/smoke-test.sh`: i dati inviati (email, indirizzo, carta `4432801561520454`) sono dati di test del demo upstream, nessun dato reale.
+- [x] Letto `deploy/overlays/dev/kustomization.yaml`, in particolare le due patch provvisorie (probe e limiti di memoria).
+- [x] Rieseguito `kustomize build deploy/overlays/dev` e controllato l'output.
+- [x] Prova da zero: `k3d cluster delete boutique`, poi `cluster-up.sh`, `kubectl --context k3d-boutique apply -k deploy/overlays/dev`, `smoke-test.sh`. Lo smoke test fallisce con 404 (nessuna route di Traefik) finché l'overlay non è applicato: comportamento atteso.
 
 **AI-06, esito (lettura statica, 2026-11-19):**
 
