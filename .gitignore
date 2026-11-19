@@ -27,3 +27,14 @@ pkg/
 release/wi-kubernetes-manifests.yaml
 vendor/
 gha-creds-*.json
+
+# --- Piattaforma: secret e credenziali locali (mai nel repo) ---
+*.agekey
+age.key
+keys.txt
+.env
+.env.*
+kubeconfig*
+*.kubeconfig
+# convenzione del progetto: secret SOPS decifrati
+*.dec.yaml
