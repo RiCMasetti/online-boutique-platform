@@ -62,11 +62,11 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 - **Verifica:**
   - Fatta durante la sessione: testo del PDF riletto per intero; somma dei pesi di valutazione ricontrollata (100%).
   - _Da fare e spuntare da me prima di fidarmi del piano:_
-    - [ ] Rileggere il PDF originale e confrontarlo con la sintesi (deliverable e passi della demo).
-    - [ ] Verificare nella documentazione ufficiale di Krateo che le composition si basino su chart Helm.
-    - [ ] Verificare che k3s applichi le NetworkPolicy di default.
-    - [ ] Verificare quali servizi di Online Boutique emettono log JSON e che la base `kustomize/` upstream contenga i component indicati.
-    - [ ] Confermare scadenza e risorse della mia macchina (RAM di Docker) prima di accettare il calendario.
+    - [x] Rileggere il PDF originale e confrontarlo con la sintesi (deliverable e passi della demo). _Fatto da me, 2026-11-19: nessuna correzione._
+    - [x] Verificare nella documentazione ufficiale di Krateo che le composition si basino su chart Helm. _Fatto da me, 2026-11-19: confermati chart Helm, OCI, tgz e private registry. Fonte: https://docs.krateo.io/how-to-guides/kco-operations/deploy-composition-definition/ (indicata da me; Claude Code non l'ha aperta né verificata)._
+    - [x] Verificare che k3s applichi le NetworkPolicy di default. _Confermato da me, 2026-11-19. Resta la prova pratica in fase 3: un pod bloccato da una policy deve davvero non raggiungere il servizio._
+    - [x] Verificare quali servizi di Online Boutique emettono log JSON e che la base `kustomize/` upstream contenga i component indicati. _Verificato da Claude Code su richiesta mia, 2026-11-19, con lettura statica di codice e manifest (non con i log a runtime). Esito in AI-04._
+    - [x] Confermare scadenza e risorse della mia macchina (RAM di Docker) prima di accettare il calendario. _Fatto da me: RAM di Docker alzata._
 - **Limiti riscontrati:**
   - La descrizione di Krateo viene dalla conoscenza generale del modello, non da una verifica sulla documentazione attuale: l'AI stessa l'ha segnalato.
   - Diverse affermazioni su Online Boutique e k3s sono dichiarate "da verificare", quindi plausibili ma non provate.
@@ -81,7 +81,17 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | ID | Giorno | Area | Strumento | Obiettivo | Esito (acc./mod./scart.) | Verifica |
 |---|---|---|---|---|---|---|
 | AI-02 | 1 | operations | Claude Code | Verificare i tool della fase 0 (versioni, presenza), risorse Docker e remote git del fork | acc. | Comandi eseguiti e output riletti: 8 tool mancanti installati da me con brew e ricontrollati; `gh repo view` conferma fork pubblico; RAM Docker alzata da me |
-| AI-03 | 1 | documentazione | Claude Code | Prima bozza di `docs/adr/0001-scelte-di-progetto.md` dalla tabella del piano | _da decidere dopo la rilettura_ | Da rileggere e correggere da me: le voci su NetworkPolicy di k3s, component upstream e log JSON restano non verificate e sono dichiarate tali nell'ADR |
+| AI-03 | 1 | documentazione | Claude Code | Prima bozza di `docs/adr/0001-scelte-di-progetto.md` dalla tabella del piano | acc. | Rilettura integrale da me, nessuna modifica. Le voci prima non verificate (NetworkPolicy di k3s, component upstream, log JSON) sono state verificate poi, vedi AI-01 e AI-04 |
+| AI-04 | 1 | operations | Claude Code | Rimuovere i workflow upstream legati a GCP, estendere `.gitignore`, aggiungere pre-commit con gitleaks, scansionare la history | acc. | Letti i workflow prima di rimuoverli (credenziali GCP di upstream, quindi inutilizzabili su un fork); YAML residui caricati con Ruby; `gitleaks git` su 2775 commit senza leak; `pre-commit run --all-files` passato. Commit `5b171834` |
+| AI-05 | 1 | analisi | Claude Code | Verificare i punti aperti di AI-01: component upstream e log JSON per servizio | mod. | Vedi sotto: ha corretto un'assunzione errata del piano |
+
+**AI-05, esito (lettura statica di `kustomize/` e `src/`, 2026-11-19):**
+
+- *Confermato:* esiste il component `network-policies` (default-deny più una policy per servizio, redis compreso). Esistono anche `without-loadgenerator`, `container-images-tag` e `container-images-registry`, utili per gli overlay.
+- *Corretto:* il piano parlava di un "component upstream" per i service account, ma **non esiste**. La base definisce già 11 ServiceAccount (uno per servizio, nessuno per `redis-cart`) e ogni Deployment usa `serviceAccountName`. Il lavoro vero è impostare `automountServiceAccountToken: false`. Il piano (fase 3) è stato aggiornato.
+- *Da tenere presente:* la base ha già `readOnlyRootFilesystem` in ogni manifest. Prima di aggiungere un hardening, controllare cosa c'è già, per non duplicare o contraddire.
+- *Log JSON, per configurazione nel codice:* Go (checkout, frontend, productcatalog, shipping) con logrus `JSONFormatter`; Node (currency, payment) con `pino`; Python (email, recommendation) con `python-json-logger`; adservice (Java) con `JsonLayout` di log4j2. **Nessuna configurazione JSON trovata** in `cartservice` (.NET), `loadgenerator` e `shoppingassistantservice`. L'ho dedotto dal codice, non l'ho osservato nei log: da riverificare con `kubectl logs` dopo il deploy (fase 2/5).
+- *Fuori dalla base:* `shoppingassistantservice` esiste in `src/` ma non nella base `kustomize/base`: è attivabile solo con il component `shopping-assistant`. Il piano parla di 11 servizi: i Deployment della base sono 12 con Redis.
 
 ---
 

@@ -76,7 +76,7 @@ L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in
 
 ### Fase 3 — Overlay, hardening e configurazione (M-L) — Sicurezza 7%
 - [ ] Overlay `dev` e `prod`: namespace, repliche, resources requests/limits, host ingress, tag immagini. Loadgenerator attivo solo in `dev`.
-- [ ] Service account dedicato per servizio (component upstream), `automountServiceAccountToken: false` dove non serve.
+- [ ] Service account: la base upstream ne definisce già uno per servizio (11, nessuno per `redis-cart`; non esiste un component dedicato). Imposta `automountServiceAccountToken: false` con una patch, e valuta un SA anche per Redis.
 - [ ] NetworkPolicy (component upstream) con default-deny. Verifica che il controller di k3s le applichi davvero.
 - [ ] `securityContext` (non-root, readOnlyRootFilesystem, drop capabilities) dove l'app lo consente; documenta le eccezioni.
 - [ ] Secret: l'app non ha secret reali, quindi crea un caso onesto (es. password Redis o credenziale di test) gestito con SOPS+age. Dichiara che è un caso costruito per la challenge.
