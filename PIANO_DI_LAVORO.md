@@ -85,10 +85,10 @@ L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in
 **Done quando:** `kustomize build` produce dev e prod diversi e validi, con policy attive.
 
 ### Fase 4 — Flux GitOps (M) — Automazione 10%
-- [ ] `flux bootstrap github` sul fork (token solo da variabile d'ambiente, mai nel repo né nei prompt).
-- [ ] `Kustomization` Flux per infrastruttura, `dev` e `prod`, con `dependsOn` corretto e decryption SOPS.
-- [ ] Promozione: `dev` segue `main`; `prod` si aggiorna solo con PR/tag esplicito.
-- [ ] Da qui in poi **ogni cambio passa da Git**.
+- [x] `flux bootstrap github` sul fork (token solo da variabile d'ambiente, mai nel repo né nei prompt).
+- [x] `Kustomization` Flux per infrastruttura, `dev` e `prod`, con `dependsOn` corretto e decryption SOPS.
+- [x] Promozione: `dev` segue `main`; `prod` si aggiorna solo con PR/tag esplicito.
+- [x] Da qui in poi **ogni cambio passa da Git**.
 
 **Done quando:** un commit su `main` aggiorna `dev` senza `kubectl apply` manuale.
 

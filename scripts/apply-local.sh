@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Applica un overlay al cluster k3d PRIMA dell'arrivo di Flux (fase 4).
+# Applica un overlay al cluster k3d SENZA Flux (uso fino alla fase 3).
+# Non usarlo su un cluster gestito da Flux: i due si contenderebbero gli oggetti.
 # Uso: scripts/apply-local.sh <dev|prod>
 #
 # Perché non `kubectl apply -k`: gli overlay contengono Secret cifrati con SOPS
 # (*.enc.yaml). Applicarli così com'sono darebbe errore o, peggio, creerebbe un Secret con
 # il testo cifrato come valore. Lo script decifra i Secret con la chiave age locale e li
 # passa a kubectl via pipe (nessun file in chiaro su disco), poi applica il resto.
-# Con Flux questo script non serve più: la decifratura la fa il controller.
+# Con Flux (docs/gitops.md) questo script non serve più: la decifratura la fa il controller.
 set -euo pipefail
 
 ENV="${1:?Uso: $0 <dev|prod>}"
