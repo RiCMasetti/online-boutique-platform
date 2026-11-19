@@ -84,6 +84,15 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-03 | 1 | documentazione | Claude Code | Prima bozza di `docs/adr/0001-scelte-di-progetto.md` dalla tabella del piano | acc. | Rilettura integrale da me, nessuna modifica. Le voci prima non verificate (NetworkPolicy di k3s, component upstream, log JSON) sono state verificate poi, vedi AI-01 e AI-04 |
 | AI-04 | 1 | operations | Claude Code | Rimuovere i workflow upstream legati a GCP, estendere `.gitignore`, aggiungere pre-commit con gitleaks, scansionare la history | acc. | Letti i workflow prima di rimuoverli (credenziali GCP di upstream, quindi inutilizzabili su un fork); YAML residui caricati con Ruby; `gitleaks git` su 2775 commit senza leak; `pre-commit run --all-files` passato. Commit `5b171834` |
 | AI-05 | 1 | analisi | Claude Code | Verificare i punti aperti di AI-01: component upstream e log JSON per servizio | mod. | Vedi sotto: ha corretto un'assunzione errata del piano |
+| AI-06 | 1 | analisi | Claude Code | Mappa dei servizi e `docs/architecture.md` (diagramma, tabelle servizio/protocollo/dipendenze, punti critici) | mod. | Lettura statica di `kustomize/base`, `protos/demo.proto`, codice di frontend, checkout, cart, recommendation e policy di rete. Vedi sotto: ha corretto il piano. **Da fare da me:** rileggere `architecture.md` confrontandolo con i manifest e spuntare la lista "Da verificare a runtime" in fase 2 |
+
+**AI-06, esito (lettura statica, 2026-11-19):**
+
+- *Corretto un'assunzione del piano:* lo scenario 2 della fase 8 ("variabile `*_SERVICE_ADDR` sbagliata → crash loop") non regge per un valore sbagliato. Frontend e checkout usano `grpc.NewClient`, che è lazy, e fanno `panic` solo se la variabile è **assente o vuota**. Con un valore errato i pod restano sani e gli errori compaiono per richiesta. Piano aggiornato con i due casi distinti. Da confermare a runtime.
+- *Trovato:* `RedisCartStore.Ping()` ritorna sempre `true` senza interrogare Redis, quindi il cartservice resta `Ready` con Redis giù. Le probe non misurano le dipendenze: l'osservabilità deve basarsi sulle richieste.
+- *Trovato:* nel component `network-policies` upstream ogni policy ha `egress: [{}]` (tutto permesso): limita solo l'ingress. Il frontend ha anche `ingress: [{}]`.
+- *Trovato:* `emailservice` ha Service su 5000 e container su 8080; le policy usano 8080.
+- *Limite:* tutto dedotto dal codice, non osservato. Le risorse totali (1,6 vCPU, 1,4 GiB di requests) sono una somma fatta a mano dai manifest. Il diagramma Mermaid non è stato renderizzato in locale.
 
 **AI-05, esito (lettura statica di `kustomize/` e `src/`, 2026-11-19):**
 

@@ -125,7 +125,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 Fase più pesante: dedicale tempo vero.
 - [ ] `scripts/break-it.sh` con almeno 3 guasti riproducibili:
   1. Tag immagine inesistente → `ImagePullBackOff`.
-  2. Variabile `*_SERVICE_ADDR` sbagliata → errori gRPC / crash loop (es. checkout).
+  2. Variabile `*_SERVICE_ADDR`: **sbagliata** (valore non vuoto) → pod sani ma errori gRPC/500 a ogni richiesta; **rimossa o vuota** → `CrashLoopBackOff` (es. checkout o frontend). Dal codice i client gRPC sono lazy (`grpc.NewClient`), quindi il crash loop non si ottiene con un valore sbagliato. Vedi `docs/architecture.md` §4; da confermare a runtime.
   3. Limite memoria troppo basso → `OOMKilled`.
   - (opzionale) NetworkPolicy troppo restrittiva → timeout tra servizi.
 - [ ] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica.
