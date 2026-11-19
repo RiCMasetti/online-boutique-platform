@@ -142,6 +142,7 @@ Fase più pesante: dedicale tempo vero.
 - [ ] Chiarisci cosa Krateo orchestra (risorse K8s, pipeline, DB) e cosa resta a Flux.
 - [ ] Benefici, prerequisiti, limiti, rischi; distingui **PoC / blueprint / adozione reale**.
 - [ ] Artefatto: diagramma di integrazione + YAML concettuale (chart wrapper per la composition). PoC solo se avanza tempo.
+- [ ] Il chart wrapper deve avere un `values.schema.json` nella root: la doc di Krateo lo indica come prerequisito di una `CompositionDefinition` (fonte in AI-LOG, AI-01). Lo schema coincide con i parametri esposti nel golden path. Rileggi la pagina direttamente, il controllo fatto finora è solo un riassunto.
 - [ ] Raccomandazione argomentata: se, quando e come adottarlo.
 
 ### Fase 10 — Documentazione finale e sezione AI (M)
