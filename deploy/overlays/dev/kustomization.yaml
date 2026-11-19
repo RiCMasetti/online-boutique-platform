@@ -22,6 +22,3 @@ labels:
 images:
   - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice
     newTag: v0.10.7
-replicas:
-  - name: frontend
-    count: 2
