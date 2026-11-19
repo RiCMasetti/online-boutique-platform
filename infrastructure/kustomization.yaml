@@ -1,0 +1,7 @@
+# Livello "infrastruttura" gestito da Flux: ciò che serve prima delle applicazioni.
+# Oggi contiene solo il namespace `monitoring`; in fase 7 si aggiungono HelmRepository
+# e HelmRelease di kube-prometheus-stack. Traefik è già incluso in k3s.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - namespace-monitoring.yaml

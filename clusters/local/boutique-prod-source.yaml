@@ -1,0 +1,14 @@
+# Sorgente di prod: il branch `prod`, che avanza solo con una PR da main (vedi docs/gitops.md).
+# Stesso repository e stessa deploy key di `flux-system`, ma un riferimento diverso.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: boutique-prod
+  namespace: flux-system
+spec:
+  interval: 1m
+  url: ssh://git@github.com/RiCMasetti/online-boutique-platform
+  ref:
+    branch: prod
+  secretRef:
+    name: flux-system
