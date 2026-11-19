@@ -96,6 +96,7 @@ L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in
 Upstream non espone metriche Prometheus, quindi serve una modifica mirata (consentita dalla traccia).
 - [ ] **Metrica applicativa:** nel `frontend` (Go) aggiungi `promhttp` con `/metrics` e un contatore/istogramma delle richieste HTTP. Modifica minima e documentata nel diff.
 - [ ] Dockerfile (multi-stage) e build riproducibile; variabili d'ambiente documentate; esecuzione locale con `docker run`.
+- [ ] Build **multi-arch** (`linux/amd64` + `linux/arm64`, `docker buildx`) del frontend, da estendere a tutti gli 11 servizi in fase 6. Le immagini upstream sono solo amd64 (ADR 0002).
 - [ ] **Metriche di supporto:** `redis_exporter` come sidecar o deployment separato; probe del frontend con blackbox exporter (opzionale).
 - [ ] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
 - [ ] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.
@@ -107,7 +108,8 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 ### Fase 6 — CI GitHub Actions (M) — Automazione 10%
 - [ ] Lint: `hadolint` sui Dockerfile modificati, `kubeconform` e `kustomize build` su dev e prod.
 - [ ] Test: `go test` del frontend (e dei servizi toccati).
-- [ ] Build e push dell'immagine su GHCR con tag = SHA.
+- [ ] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
+- [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
 - [ ] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
 - [ ] Scansione immagine (Trivy) come plus, non bloccante.
 

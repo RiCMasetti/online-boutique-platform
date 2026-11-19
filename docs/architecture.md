@@ -219,4 +219,4 @@ Correzioni applicate in `deploy/overlays/dev/kustomization.yaml`, marcate come p
 
 Consumi osservati a regime, con il loadgenerator attivo: adservice 225Mi, cartservice 169Mi, currencyservice 127Mi, paymentservice 125Mi, recommendationservice 67Mi, emailservice 73Mi, frontend 42Mi, checkout 36Mi, productcatalog 35Mi, shipping 32Mi, redis 11Mi, loadgenerator 86Mi (501m di CPU, vicino al limite).
 
-**Conseguenze per le fasi successive.** Il build dell'immagine custom (fase 5) e la CI (fase 6) devono produrre immagini **multi-arch** (`linux/amd64` e `linux/arm64`), altrimenti il frontend custom girerà emulato in locale. Gli altri servizi restano amd64 emulati finché non si ricostruiscono: va deciso se costruirli tutti o tenere il workaround.
+**Decisione.** Costruire tutti gli 11 servizi come immagini multi-arch (`amd64` e `arm64`) e pubblicarle su GHCR: vedi [ADR 0002](adr/0002-immagini-multi-arch.md). Fino alla fase 6 restano le immagini upstream con i workaround dell'overlay dev.
