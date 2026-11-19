@@ -25,5 +25,5 @@ Con Flux, `dev` deve seguire `main` e `prod` deve cambiare solo per una scelta e
 
 ## Alternative scartate
 
-- **Tag con `ref.semver`:** la promozione sarebbe un tag immutabile (più pulito), ma Flux seleziona i tag solo con un intervallo semver e il fork contiene i tag upstream (`v0.8.1`, `v0.9.0`, ...): prod si agganciebbe alla release upstream più recente, che non contiene `deploy/`. Si potrebbe usare una convenzione di nomi dedicata; non vale la complessità per ora.
+- **Tag con `ref.semver`:** la promozione sarebbe un tag immutabile (più pulito), ma Flux seleziona i tag solo con un intervallo semver e il fork contiene i tag upstream (`v0.8.1`, `v0.9.0`, ...): prod si aggancerebbe alla release upstream più recente, che non contiene `deploy/`. Si potrebbe usare una convenzione di nomi dedicata; non vale la complessità per ora.
 - **Due repository o due cluster:** separazione più forte, costo sproporzionato per questa challenge (vedi ADR 0001).
