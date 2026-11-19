@@ -1,5 +1,7 @@
 # cymbal-shops.retail.cymbal.dev manifests
 
+> **Documento upstream, non applicabile a questo fork.** Questi manifest configurano il cluster GKE di produzione di Google (indirizzo IP statico, Cloud Armor, certificato gestito su `cymbal-shops.retail.cymbal.dev`) e richiedono `gcloud` e un progetto GCP che questo progetto non ha. Il deploy di questo fork usa k3d, Kustomize e Flux. Il testo originale è lasciato sotto per ridurre i conflitti con `upstream`.
+
 This directory contains extra deploy manifests for configuring Online Boutique solution on GKE for cymbal-shops.retail.cymbal.dev.
 
 _Note: before moving forward, the Online Boutique apps should already be deployed [on the online-boutique-release GKE cluster](/docs/releasing#10-deploy-releasekubernetes-manifestsyaml-to-our-online-boutique-release-gke-cluster)._

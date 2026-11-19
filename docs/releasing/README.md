@@ -1,5 +1,7 @@
 # Releasing Online Boutique
 
+> **Documento upstream, non applicabile a questo fork.** Descrive il processo di release interno di Google (workflow "Manual Release Builder", progetto GCP `online-boutique-ci`, cluster GKE `online-boutique-release`). Il workflow è stato rimosso da questo fork e gli script in questa cartella richiedono quel progetto GCP, quindi qui non funzionano. Build, CI e rilascio di questo fork (GitHub Actions, GHCR, Flux) sono descritti nella documentazione del progetto. Il testo originale è lasciato sotto per ridurre i conflitti con `upstream`.
+
 This document walks through the process of creating a new release of Online Boutique.
 
 ## Prerequisites for tagging a release
