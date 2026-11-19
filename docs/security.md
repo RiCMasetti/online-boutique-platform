@@ -35,6 +35,23 @@ Controlli negativi eseguiti (k3s applica le policy davvero):
 
 **Custodia della chiave.** Se si perde `keys.txt`, i Secret nel repo non sono più decifrabili e vanno rigenerati. Va fatto un backup fuori dal repo. Ogni cluster nuovo ha bisogno della stessa chiave (in fase 4 diventa il Secret `sops-age` in `flux-system`, creato da file locale e mai committato).
 
+### Chi fa cosa: SOPS, Kustomize e Flux
+
+**Kustomize non integra SOPS.** `.sops.yaml` è letto solo dal programma `sops` quando si cifra; Kustomize e Flux non lo usano.
+
+| Fase | Chi agisce | Cosa usa |
+|---|---|---|
+| Cifratura | `sops --encrypt` | `.sops.yaml`: la regola con `path_regex` sceglie la chiave pubblica age e i campi da cifrare (`data`, `stringData`). Il nome del file deve corrispondere a `deploy/.*\.enc\.yaml$` (per questo si usa `--filename-override`). |
+| Build | `kustomize build` | Tratta `redis-auth.enc.yaml` come un normale Secret in `resources:`. La chiave `sops:` in più (destinatario age e MAC) passa inalterata. |
+| Decifratura | `sops --decrypt` (oggi `scripts/apply-local.sh`), in futuro il controller Flux | Il blocco `sops:` dentro il file e la **chiave privata**. Non `.sops.yaml`. |
+
+Conseguenze pratiche:
+- `kubectl apply -k` non è utilizzabile sugli overlay: applicherebbe il testo cifrato come valore del Secret (da qui `apply-local.sh`, che decifra e applica via pipe).
+- `kubeconform -strict` rifiuta il Secret cifrato per la chiave sconosciuta `sops`: nella validazione va escluso (`-skip Secret`).
+- Con Flux (fase 4) la `Kustomization` dichiarerà `spec.decryption: {provider: sops, secretRef: {name: sops-age}}` e il controller decifrerà con la chiave privata presente nel cluster.
+- **Da verificare in fase 4:** che il controller decifri correttamente il Secret dopo il `kustomize build` con le patch usate qui. Non è stato provato né riletto nella documentazione di Flux.
+- Esiste KSOPS, un generatore che integra SOPS dentro Kustomize con un plugin esterno. Non è adottato: per questo progetto la decifratura nativa di Flux è più semplice.
+
 ## 3. Limiti residui
 
 Dichiarati apertamente: non sono difetti nascosti, ma confini di ciò che è stato fatto.
