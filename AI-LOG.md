@@ -100,15 +100,15 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 - *Segreti:* chiave age generata in locale (`~/.config/sops/age/keys.txt`, permessi 600, fuori dal repo); password casuali cifrate senza mai passare dall'output; `.sops.yaml` contiene solo la chiave pubblica. Nessun valore segreto è entrato in prompt, log o repo.
 - *Limiti:* l'uscita di rete non è limitata (upstream `egress: [{}]`); `kustomize build` include il Secret cifrato, quindi `kubectl apply -k` non è utilizzabile finché non c'è Flux (da qui `apply-local.sh`); la decifratura da parte di Flux dopo il build non è ancora provata (fase 4); la dichiarazione "k3s non cifra i Secret a riposo" non è verificata. Elenco completo in `docs/security.md`.
 
-**AI-09, verifica (da spuntare da me prima del commit della fase 3):**
+**AI-09, verifica (2026-11-19). Su richiesta mia, Claude Code ha eseguito i controlli che poteva fare: le voci spuntate sono verificate da lui, non da una mia lettura personale. Le due voci che spettavano a me (backup della chiave, prova da zero) le ho spuntate dopo averle fatte.**
 
-- [ ] Letto `deploy/base/kustomization.yaml` e i due component (`network-policies`, `arm64-workaround`).
-- [ ] Letto `deploy/overlays/{dev,prod}/kustomization.yaml` e controllato che le differenze dev/prod siano quelle volute (repliche, loadgenerator, risorse frontend, host).
-- [ ] Letti `scripts/apply-local.sh` e `scripts/netpol-test.sh` riga per riga (in particolare il filtro dei documenti `sops:` e la costruzione dell'`--overrides`).
-- [ ] Controllato che nessun file `*.enc.yaml` contenga valori in chiaro e che `~/.config/sops/age/keys.txt` non sia nel repo (`git ls-files | grep -i key`, `gitleaks`).
-- [ ] Fatto un backup della chiave privata age fuori dal repo.
-- [ ] Letto `docs/security.md` e confermato che i limiti residui siano completi e onesti.
-- [ ] Prova da zero: `k3d cluster delete boutique`, `scripts/cluster-up.sh`, `scripts/apply-local.sh dev`, `scripts/apply-local.sh prod`, smoke test e `netpol-test.sh` su entrambi.
+- [x] Letto `deploy/base/kustomization.yaml` e i due component (`network-policies`, `arm64-workaround`). _Claude Code: letti per intero. `network-policies` riusa il component upstream e restringe l'ingress del frontend a Traefik e loadgenerator (porta 8080); `arm64-workaround` allunga probe e limiti di memoria solo per i servizi indicati._
+- [x] Letto `deploy/overlays/{dev,prod}/kustomization.yaml` e controllato che le differenze dev/prod siano quelle volute. _Claude Code: confermate. dev: loadgenerator attivo, 1 replica, host `boutique-dev.localtest.me`. prod: senza loadgenerator (ServiceAccount e NetworkPolicy orfani rimossi), frontend e productcatalog a 2 repliche, limiti del frontend più alti, host `boutique-prod.localtest.me`. `kustomize build` valido: 12 Deployment in dev, 11 in prod._
+- [x] Letti `scripts/apply-local.sh` e `scripts/netpol-test.sh` riga per riga. _Claude Code: letti per intero. Il filtro `sops:` esclude i documenti con la chiave top-level, la decifratura passa per pipe senza file su disco, l'`--overrides` dichiara immagine e comando del container, e un pod senza `rc=N` è un errore, non un "blocked"._
+- [x] Controllato che nessun `*.enc.yaml` contenga valori in chiaro e che la chiave privata age non sia nel repo. _Claude Code: in entrambi i file `password` è `ENC[AES256_GCM,...]`; `git ls-files` non mostra chiavi; `.gitignore` esclude `keys.txt`, `*.agekey`, `age.key`, `*.dec.yaml`; `gitleaks`: 2785 commit, nessun leak; `keys.txt` ha permessi 600 ed è fuori dal repo._
+- [x] Fatto un backup della chiave privata age fuori dal repo. _Confermato da me, 2026-11-19. Claude Code non ha visto né copiato la chiave e non può verificarlo._
+- [x] Letto `docs/security.md` e confermato che i limiti residui siano completi e onesti. _Claude Code: letto per intero, coerente con le patch lette sopra (egress libero, Redis senza persistenza e TLS, password visibile nei processi, una sola chiave age, ambienti sullo stesso nodo, workaround arm64). È una lettura, non una prova: giudizio da riconfermare da me._
+- [x] Prova da zero: `k3d cluster delete boutique`, `scripts/cluster-up.sh`, `scripts/apply-local.sh dev`, `scripts/apply-local.sh prod`, smoke test e `netpol-test.sh` su entrambi. _Fatta da me, 2026-11-19: confermo l'esito positivo. Claude Code non l'ha eseguita (distruttiva) e non ha visto l'output; prima aveva solo rieseguito smoke test e `netpol-test.sh` sul cluster esistente, superati in dev e prod._
 
 **AI-07, verifica (spuntato in base alla mia conferma del 2026-11-19: letti i due script e l'overlay, provato tutto da zero):**
 
