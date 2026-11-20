@@ -103,7 +103,7 @@ Cosa ne segue:
 
 - **I nomi dei campi non sono uniformi**: il livello è `severity` in 9 servizi su 10 (adservice usa `level`) e il tempo è `timestamp`, `time` o `instant`. Una query unica sui log dovrebbe normalizzarli. Lo stack della fase 7 non include un aggregatore di log (solo Prometheus), quindi oggi non è un problema operativo: resta `kubectl logs`.
 - **cartservice e loadgenerator non emettono JSON.** Non li ho modificati: fuori dal perimetro della fase 5 (il cartservice è codice .NET upstream).
-- **Frontend: righe non JSON a ogni visita della home.** `handlers.go:96` chiama `fmt.Println("env platform is either empty or invalid")` se `ENV_PLATFORM` non è impostata (63 righe in circa 20 minuti). Soluzione di configurazione, senza toccare il codice: `ENV_PLATFORM=local` nel Deployment (patch in `deploy/base/kustomization.yaml`). È il valore che il codice userebbe comunque, quindi la pagina non cambia.
+- **Frontend: righe non JSON a ogni visita della home.** `handlers.go:96` chiama `fmt.Println("env platform is either empty or invalid")` se `ENV_PLATFORM` non è impostata (63 righe in circa 20 minuti). Soluzione di configurazione, senza toccare il codice: `ENV_PLATFORM=local` nel Deployment (patch in `deploy/base/kustomization.yaml`). È il valore che il codice userebbe comunque, quindi la pagina non cambia. **Provato nel cluster** (commit `75f89cf0`): nel pod nuovo 344 righe di log, tutte JSON, con 72 richieste alla home (prima ognuna produceva una riga di testo); smoke test superato.
 - **Limite della verifica:** ho guardato le righe recenti in condizioni normali. Non ho controllato i percorsi di errore (stack trace, panic) né il formato dei log di avvio.
 
 ## 7. Probe
