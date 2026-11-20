@@ -110,7 +110,7 @@ Cosa ne segue:
 
 ## 7. Probe
 
-Quelle in uso sono le probe upstream (gRPC per i servizi, `/_healthz` per il frontend, `tcpSocket` per Redis) più, solo in prod, i ritocchi del component `arm64-workaround` (timeout 5 s e ritardi iniziali, per i servizi emulati). Dev dal 2026-11-20 usa le probe upstream senza ritocchi (timeout 1 s): con le immagini native e il loadgenerator attivo non ci sono restart, ma si vedono eventi `Unhealthy` di readiness negli avvii durante i rollout (docs/ci.md §5).
+Quelle in uso sono le probe upstream (gRPC per i servizi, `/_healthz` per il frontend, `tcpSocket` per Redis) più, fino alla promozione di prod alle immagini GHCR, i ritocchi del component `arm64-workaround` (timeout 5 s e ritardi iniziali, per i servizi emulati; il component è stato eliminato con la promozione). Dev dal 2026-11-20 e prod dopo la promozione usano le probe upstream senza ritocchi (timeout 1 s): con le immagini native e il loadgenerator attivo non ci sono restart, ma si vedono eventi `Unhealthy` di readiness negli avvii durante i rollout (docs/ci.md §5).
 
 Cosa controllano davvero, letto nel codice:
 
