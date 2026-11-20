@@ -61,6 +61,8 @@ I workflow upstream `ci-pr.yaml` e `ci-main.yaml` sono stati sostituiti: provava
 
 - [ ] Pacchetti resi pubblici; `update-dev` ha committato il tag.
 - [ ] Rollout in dev su arm64 senza emulazione: pod `Ready`, smoke test superato.
-- [ ] Rimuovere `deploy/components/arm64-workaround` da dev e prod (e dalle righe `components:`); riverificare probe e memoria sotto carico (lo chiede AI-13).
+- [x] Primo rilascio (run 44726672556, tag `06974f96d9ae`): pacchetti pubblici, `update-dev` ha committato il tag, rollout in dev su arm64 senza emulazione (12 deployment, 0 restart, smoke test superato).
+- [x] Workaround arm64 tolto da **dev**. Resta in **prod**, che usa ancora le immagini upstream amd64: togliendolo lì senza passare alle immagini GHCR prod si romperebbe.
+- [ ] Riverificare probe e memoria di dev sotto carico, senza workaround (lo chiede AI-13).
 - [ ] Promuovere a prod con una PR che porta il blocco `images` nell'overlay prod.
 - [ ] Annotare durata dei build e dei runner arm64 (ADR 0002 lo chiede).

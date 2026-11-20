@@ -12,7 +12,6 @@ components:
   # con Traefik sulla porta 80. L'accesso passa dall'Ingress.
   - ../../../kustomize/components/non-public-frontend
   - ../../components/network-policies
-  - ../../components/arm64-workaround   # da rimuovere con le immagini multi-arch (ADR 0002)
   - ../../components/dev-images         # tag delle immagini, aggiornato dalla CI (workflow release)
 labels:
   - pairs:

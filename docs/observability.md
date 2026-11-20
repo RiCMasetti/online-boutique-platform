@@ -65,9 +65,9 @@ curl localhost:8080/metrics
 
 ## 4. Immagine nel cluster, in attesa di GHCR
 
-_Aggiornamento fase 6: la CI pubblica le immagini su GHCR e aggiorna dev ([docs/ci.md](ci.md)); finché non gira, vale quanto segue._
+**Aggiornamento (fase 6, 2026-11-20):** dev usa ora l'immagine GHCR costruita dalla CI ([docs/ci.md](ci.md)), tag nel component `deploy/components/dev-images`; l'import in k3d non serve più. Quanto segue è la storia della fase 5.
 
-Fino alla fase 6 non c'è un registry: l'immagine si importa con `k3d image import boutique/frontend:phase5 -c boutique` e l'overlay dev la referenzia (`images:` in `deploy/overlays/dev/kustomization.yaml`). Il tag non è `latest`, quindi il pull policy è `IfNotPresent` e kubelet usa l'immagine importata. **Limite:** funziona solo su questo cluster e se l'immagine è stata importata; su un cluster nuovo il pod va in `ErrImagePull` finché non si rifà l'import. Prod resta sull'immagine upstream.
+Fino alla fase 6 non c'era un registry: l'immagine si importa con `k3d image import boutique/frontend:phase5 -c boutique` e l'overlay dev la referenzia (`images:` in `deploy/overlays/dev/kustomization.yaml`). Il tag non è `latest`, quindi il pull policy è `IfNotPresent` e kubelet usa l'immagine importata. **Limite:** funziona solo su questo cluster e se l'immagine è stata importata; su un cluster nuovo il pod va in `ErrImagePull` finché non si rifà l'import. Prod resta sull'immagine upstream.
 
 ## 5. Metriche di Redis (`redis_exporter`)
 
@@ -110,7 +110,7 @@ Cosa ne segue:
 
 ## 7. Probe
 
-Quelle in uso sono le probe upstream (gRPC per i servizi, `/_healthz` per il frontend, `tcpSocket` per Redis) più i ritocchi del component `arm64-workaround` (timeout 5 s e ritardi iniziali, solo per i servizi emulati).
+Quelle in uso sono le probe upstream (gRPC per i servizi, `/_healthz` per il frontend, `tcpSocket` per Redis) più, solo in prod, i ritocchi del component `arm64-workaround` (timeout 5 s e ritardi iniziali, per i servizi emulati). Dev dal 2026-11-20 usa le probe upstream senza ritocchi.
 
 Cosa controllano davvero, letto nel codice:
 

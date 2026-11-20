@@ -111,13 +111,14 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
   - _Verificato in locale e sulla PR #2 (2026-11-20). Vedi `docs/ci.md`._
 - [x] Test: `go test` del frontend (e dei servizi toccati).
   - _Come sopra. Corretto un `status.Errorf` in checkoutservice che faceva fallire `go vet`._
-- [ ] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
+- [x] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
   - _Runner arm64 nativi disponibili sul fork pubblico; build di 11 servizi × 2 architetture passate sulla PR (senza push); push da provare. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
 - [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
-- [ ] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
-  - _Scritto: commit automatico in `deploy/components/dev-images`; da provare._
+  - _Dev: fatto (immagini GHCR, workaround tolto nella PR dedicata). Prod: ancora immagini upstream e workaround, in attesa della promozione (`docs/ci.md` §5)._
+- [x] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
+  - _Commit automatico in `deploy/components/dev-images`: provato, Flux ha fatto il rollout in dev (12/12 pronti, smoke test ok)._
 - [ ] Scansione immagine (Trivy) come plus, non bloccante.
-  - _Scritta (job `scan`); da provare._
+  - _Scritta (job `scan`); primo run fallito per un bug di maiuscole, correzione in PR #3, da riprovare._
 
 **Done quando:** una PR fa girare i controlli; il merge produce un'immagine e un rollout in `dev`.
 

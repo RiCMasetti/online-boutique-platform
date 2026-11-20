@@ -1,6 +1,6 @@
 # WORKAROUND per nodi arm64 (Apple Silicon): le immagini upstream sono solo amd64 e girano
-# emulate (ADR 0002). Con le immagini multi-arch (fase 6) si elimina questa cartella e la
-# riga `components:` negli overlay.
+# emulate (ADR 0002). Dev non lo usa più dal 2026-11-20 (immagini GHCR multi-arch); resta
+# solo per prod, che usa ancora le immagini upstream. Si elimina con la promozione di prod.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
 patches:
