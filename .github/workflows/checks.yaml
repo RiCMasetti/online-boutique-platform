@@ -11,6 +11,8 @@ permissions:
 env:
   HADOLINT_IMAGE: ghcr.io/hadolint/hadolint:v2.15.1
   KUBECONFORM_VERSION: v0.8.0
+  # Stessa versione di Prometheus del chart kube-prometheus-stack 93.6.0 (versione non distroless: ha promtool).
+  PROMETHEUS_IMAGE: quay.io/prometheus/prometheus:v3.16.0
 
 jobs:
   hadolint:
@@ -56,6 +58,30 @@ jobs:
             kubeconform -strict -skip Secret -summary -kubernetes-version 1.33.0 "/tmp/$env.yaml"
             echo "::endgroup::"
           done
+      # Osservabilità (fase 7): HelmRelease, ServiceMonitor e PrometheusRule sono CRD senza schema
+      # nel catalogo di kubeconform, quindi `-ignore-missing-schemas`: si controlla che il
+      # build funzioni e che gli oggetti Kubernetes standard siano validi, non i CRD.
+      - name: kustomize build + kubeconform (observability)
+        run: |
+          set -eu
+          for d in stack config; do
+            echo "::group::observability/$d"
+            kustomize build "observability/$d" > "/tmp/obs-$d.yaml"
+            kubeconform -strict -skip Secret -ignore-missing-schemas -summary -kubernetes-version 1.33.0 "/tmp/obs-$d.yaml"
+            echo "::endgroup::"
+          done
+      # Sintassi PromQL delle regole e test unitari degli alert su serie sintetiche.
+      # Ruby è preinstallato sui runner GitHub.
+      - name: promtool (regole e test degli alert)
+        run: |
+          set -eu
+          mkdir -p /tmp/pt
+          ruby -ryaml -e 'd=YAML.load_file("observability/config/rules.yaml"); puts({"groups"=>d["spec"]["groups"]}.to_yaml)' > /tmp/pt/rules.generated.yaml
+          cp observability/config/tests/rules_test.yaml /tmp/pt/
+          docker run --rm --entrypoint /bin/promtool -v /tmp/pt:/t:ro -w /t "$PROMETHEUS_IMAGE" check rules rules.generated.yaml
+          docker run --rm --entrypoint /bin/promtool -v /tmp/pt:/t:ro -w /t "$PROMETHEUS_IMAGE" test rules rules_test.yaml
+      - name: La dashboard è JSON valido
+        run: python3 -c "import json; d=json.load(open('observability/config/boutique.json')); print(d['title'], len(d['panels']), 'pannelli')"
 
   test:
     runs-on: ubuntu-24.04

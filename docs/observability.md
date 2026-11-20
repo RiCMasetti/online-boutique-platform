@@ -143,3 +143,30 @@ Altre osservazioni, non corrette:
 ## 8. Ancora da fare in fase 5
 
 Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch degli altri servizi e la riverifica delle probe sono in fase 6.
+
+## 8. Stack di osservabilità (fase 7)
+
+**Stato: scritto e validato staticamente (`helm template`, `kustomize build`, `kubeconform`); non ancora installato nel cluster.** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
+
+| Cosa | Dove |
+|---|---|
+| kube-prometheus-stack 93.6.0 (HelmRelease) | `observability/stack/` |
+| ServiceMonitor frontend e redis-cart | `observability/config/servicemonitors.yaml` |
+| Alert | `observability/config/rules.yaml` |
+| Dashboard "Online Boutique: panoramica" | `observability/config/boutique.json` |
+| Kustomization Flux | `clusters/local/observability-stack.yaml`, `observability-config.yaml` |
+| NetworkPolicy per Prometheus | `deploy/components/network-policies/kustomization.yaml` |
+
+**Accesso**
+
+- Grafana: `http://grafana.localtest.me:8080`, utente `admin`. La password è nel Secret cifrato `observability/stack/grafana-admin.enc.yaml`: si legge con `sops -d` (serve la chiave privata age, che non è nel repository) oppure dal cluster con `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d`.
+- Prometheus: `kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090`.
+- Alertmanager: `kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093`.
+
+**Alert** (dev e prod): `FrontendUnavailable` (nessuna replica pronta, 1 min), `PodCrashLooping` (CrashLoopBackOff, 2 min), `RedisDown` (`redis_up 0` oppure nessuna replica pronta, 1 min), `FrontendHigh5xxRate` (oltre il 5% di 5xx con almeno 0,2 richieste/s, 2 min). `FrontendUnavailable` e `RedisDown` usano kube-state-metrics e non `up`: se il pod sparisce la serie `up` scompare e `up == 0` non scatterebbe.
+
+**Test degli alert (eseguiti, senza cluster):** `observability/config/tests/rules_test.yaml` prova la logica delle quattro regole con `promtool test rules` su serie sintetiche (Redis giù con pod non pronto → un solo alert; Redis spento senza serie dell'exporter; Redis sano; frontend senza repliche; 5xx alti con e senza traffico; crash loop). Girano anche in CI. Verificato che i test possono fallire: con la vecchia espressione di `RedisDown` (senza aggregazione per namespace) scattavano due alert per un solo guasto. Non provano il cluster né che le metriche abbiano quelle etichette.
+
+**Limite noto degli alert:** se un Deployment viene cancellato, kube-state-metrics non emette più la serie `kube_deployment_status_replicas_available` e `FrontendUnavailable`/`RedisDown` non scattano (servirebbe un `absent()`). Flux ricrea l'oggetto al giro successivo.
+
+**Da verificare nel cluster** (e da annotare qui quando fatto): installazione dello stack da Flux, target `up` di frontend e redis-cart in dev e prod, query della dashboard con dati reali, un alert che scatta con un guasto provocato.

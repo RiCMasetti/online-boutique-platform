@@ -1,7 +1,7 @@
-# SOPS: cifra solo data/stringData dei file *.enc.yaml sotto deploy/.
+# SOPS: cifra solo data/stringData dei file *.enc.yaml sotto deploy/ e observability/.
 # La chiave pubblica è pubblica per costruzione; quella privata sta fuori dal repo
 # (vedi README, sezione segreti) e non va mai committata né incollata in prompt.
 creation_rules:
-  - path_regex: deploy/.*\.enc\.yaml$
+  - path_regex: (deploy|observability)/.*\.enc\.yaml$
     encrypted_regex: ^(data|stringData)$
     age: age1k7eurz4u6lzyj37z0c4hyld57e3htr77t7mtl66cpdrh2hpvxayq2us7wa

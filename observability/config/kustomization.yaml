@@ -1,0 +1,16 @@
+# Configurazione di osservabilità del progetto: ServiceMonitor, PrometheusRule, dashboard.
+# Si applica dopo lo stack (Flux: observability-config dipende da observability-stack).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - servicemonitors.yaml
+  - rules.yaml
+configMapGenerator:
+  - name: boutique-dashboard
+    namespace: monitoring
+    files:
+      - boutique.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"
