@@ -1,0 +1,61 @@
+# Alert del progetto, pensati per gli scenari di failure della fase 8.
+# Si valutano su dev e prod (namespace boutique-dev e boutique-prod).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: boutique
+  namespace: monitoring
+spec:
+  groups:
+    - name: boutique.availability
+      rules:
+        # Si basa su kube-state-metrics e non su `up`: se il pod sparisce, la serie `up`
+        # smette di esistere e un `up == 0` non scatterebbe mai.
+        - alert: FrontendUnavailable
+          expr: kube_deployment_status_replicas_available{namespace=~"boutique-(dev|prod)", deployment="frontend"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Frontend non disponibile in {{ $labels.namespace }}"
+            description: "Nessuna replica pronta del Deployment frontend da oltre un minuto."
+        - alert: PodCrashLooping
+          expr: kube_pod_container_status_waiting_reason{namespace=~"boutique-(dev|prod)", reason="CrashLoopBackOff"} == 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.pod }} in crash loop in {{ $labels.namespace }}"
+            description: "Il container {{ $labels.container }} è in CrashLoopBackOff da oltre due minuti."
+        # Come sopra, due condizioni: l'exporter segnala `redis_up 0` (Redis giù ma pod vivo)
+        # oppure non c'è nessuna replica pronta (pod assente, e con lui l'exporter).
+        - alert: RedisDown
+          expr: |
+            (redis_up{namespace=~"boutique-(dev|prod)"} == 0)
+            or
+            (kube_deployment_status_replicas_available{namespace=~"boutique-(dev|prod)", deployment="redis-cart"} == 0)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Redis (carrello) non disponibile in {{ $labels.namespace }}"
+            description: "Il carrello non funziona: il frontend risponde con errori 5xx alle pagine che lo usano."
+    - name: boutique.errors
+      rules:
+        # Almeno 0,2 richieste/s per non scattare su traffico quasi nullo, dove una sola
+        # richiesta fallita darebbe una percentuale alta.
+        - alert: FrontendHigh5xxRate
+          expr: |
+            (
+              sum by (namespace) (rate(frontend_http_requests_total{code=~"5..", namespace=~"boutique-(dev|prod)"}[2m]))
+              /
+              sum by (namespace) (rate(frontend_http_requests_total{namespace=~"boutique-(dev|prod)"}[2m]))
+            ) > 0.05
+            and
+            sum by (namespace) (rate(frontend_http_requests_total{namespace=~"boutique-(dev|prod)"}[2m])) > 0.2
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Più del 5% di errori 5xx dal frontend in {{ $labels.namespace }}"
+            description: "Quota di risposte 5xx negli ultimi due minuti: {{ $value | humanizePercentage }}."

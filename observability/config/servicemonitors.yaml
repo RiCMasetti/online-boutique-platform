@@ -1,0 +1,36 @@
+# Prometheus raccoglie le metriche del frontend (/metrics, fase 5) e dell'exporter di Redis
+# in entrambi gli ambienti. Il namespace di ogni serie è quello del target (boutique-dev o
+# boutique-prod); `targetLabels` aggiunge anche l'etichetta `environment` del Service.
+# Servono le regole NetworkPolicy che ammettono Prometheus (deploy/components/network-policies).
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: boutique-frontend
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [boutique-dev, boutique-prod]
+  selector:
+    matchLabels:
+      app: frontend
+  targetLabels: [environment]
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: boutique-redis-cart
+  namespace: monitoring
+spec:
+  namespaceSelector:
+    matchNames: [boutique-dev, boutique-prod]
+  selector:
+    matchLabels:
+      app: redis-cart
+  targetLabels: [environment]
+  endpoints:
+    - port: metrics
+      interval: 15s
