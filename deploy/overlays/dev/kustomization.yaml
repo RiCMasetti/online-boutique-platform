@@ -20,5 +20,10 @@ labels:
     includeTemplates: true
 # Tag delle immagini: in fase 6 la CI aggiorna questi valori (kustomize edit set image).
 images:
+  # Fase 5: frontend con /metrics, costruito in locale e importato in k3d con
+  # `k3d image import` (nessun registry). In fase 6 diventa un'immagine GHCR con tag = SHA.
+  - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/frontend
+    newName: boutique/frontend
+    newTag: phase5
   - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice
     newTag: v0.10.7
