@@ -99,8 +99,8 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 - [ ] Build **multi-arch** (`linux/amd64` + `linux/arm64`, `docker buildx`) del frontend, da estendere a tutti gli 11 servizi in fase 6. Le immagini upstream sono solo amd64 (ADR 0002).
   - _Parziale (2026-11-20): build locale `arm64` e `amd64` separate, binari verificati con `file`; manca il manifest multi-arch unico e il push su GHCR (fase 6). Vedi `docs/observability.md`._
 - [x] **Metriche di supporto:** `redis_exporter` come sidecar o deployment separato; probe del frontend con blackbox exporter (opzionale).
-- [ ] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
-- [ ] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.
+- [x] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
+- [x] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.
 
 **Piano B se il tempo stringe:** solo `redis_exporter` + kube-state-metrics + cAdvisor, spiegando perché non hai toccato il frontend.
 

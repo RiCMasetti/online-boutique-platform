@@ -84,6 +84,60 @@ Provato in locale (container Docker con `redis:alpine --requirepass`): password 
 
 Provato nel cluster dopo il push (commit `58d2d340`, Flux ha applicato dev): pod `redis-cart` `2/2 Running`, 0 riavvii; `/metrics` letto dalla porta `metrics` del Service (via `port-forward`) con `redis_up 1`, `redis_exporter_last_scrape_error 0`, 3 client connessi, 5 chiavi in `db0`, circa 1,7 MB di memoria; lo smoke test (carrello e checkout intero) passa con il Redis riavviato, quindi il sidecar non disturba cartservice. Il riavvio del pod ha azzerato i carrelli esistenti (`emptyDir`), come previsto. **Non provato:** il caso di guasto nel cluster (`redis_up 0` visto solo in locale); la raccolta da parte di Prometheus (fase 7, e la NetworkPolicy di Redis dovrà ammettere il namespace `monitoring` sulla 9121); prod, che riceverà il sidecar solo con la PR `main → prod`.
 
-## 6. Ancora da fare in fase 5
+## 6. Log strutturati
 
-Verifica dei log JSON degli altri servizi a runtime (`kubectl logs`); controllo delle probe; blackbox exporter per il frontend (opzionale, non fatto); build multi-arch degli altri servizi (fase 6).
+Controllati a runtime in dev (ultime 200 righe di ogni servizio, circa 20 minuti di traffico del loadgenerator): per ogni riga ho verificato che sia un oggetto JSON valido. Il risultato conferma l'analisi dal codice di fase 1.
+
+| Servizio | Formato | Campo tempo / livello |
+|---|---|---|
+| checkoutservice, productcatalogservice, shippingservice | JSON (logrus) | `timestamp`, `severity`, `message` |
+| frontend | JSON (logrus), più campi `http.*` | `timestamp`, `severity`, `message` |
+| emailservice, recommendationservice | JSON (python-json-logger) | `timestamp`, `severity`, `message`, `name` |
+| currencyservice, paymentservice | JSON (pino) | `time`, `severity`, `message`, `name`, `pid`, `hostname` |
+| adservice | JSON (log4j2 `JsonLayout`) | `instant`, **`level`** (non `severity`), `message`, `logging.googleapis.com/*` |
+| **cartservice** | **testo** (`Console.WriteLine`) | nessuno |
+| **loadgenerator** | **testo** (shell e Locust) | nessuno |
+| redis-cart | testo (formato Redis); il sidecar usa logfmt | nessuno |
+
+Cosa ne segue:
+
+- **I nomi dei campi non sono uniformi**: il livello è `severity` in 9 servizi su 10 (adservice usa `level`) e il tempo è `timestamp`, `time` o `instant`. Una query unica sui log dovrebbe normalizzarli. Lo stack della fase 7 non include un aggregatore di log (solo Prometheus), quindi oggi non è un problema operativo: resta `kubectl logs`.
+- **cartservice e loadgenerator non emettono JSON.** Non li ho modificati: fuori dal perimetro della fase 5 (il cartservice è codice .NET upstream).
+- **Frontend: righe non JSON a ogni visita della home.** `handlers.go:96` chiama `fmt.Println("env platform is either empty or invalid")` se `ENV_PLATFORM` non è impostata (63 righe in circa 20 minuti). Soluzione di configurazione, senza toccare il codice: `ENV_PLATFORM=local` nel Deployment (patch in `deploy/base/kustomization.yaml`). È il valore che il codice userebbe comunque, quindi la pagina non cambia.
+- **Limite della verifica:** ho guardato le righe recenti in condizioni normali. Non ho controllato i percorsi di errore (stack trace, panic) né il formato dei log di avvio.
+
+## 7. Probe
+
+Quelle in uso sono le probe upstream (gRPC per i servizi, `/_healthz` per il frontend, `tcpSocket` per Redis) più i ritocchi del component `arm64-workaround` (timeout 5 s e ritardi iniziali, solo per i servizi emulati).
+
+Cosa controllano davvero, letto nel codice:
+
+- Frontend: `/_healthz` risponde "ok" senza contattare i backend.
+- checkoutservice, productcatalogservice, shippingservice, emailservice, recommendationservice, currencyservice, paymentservice, adservice: rispondono `SERVING` in modo incondizionato.
+- **cartservice:** il gestore ha un metodo `Ping()` che sembra controllare Redis, ma in `RedisCartStore.cs` è `try { return true; }`: **non controlla nulla**. (Avevo dedotto il contrario dalla sola firma del costruttore, prima di leggere il metodo: errore mio.)
+- redis-cart: `tcpSocket` sulla 6379, quindi non verifica nemmeno la password.
+
+**Prova nel cluster: Redis spento in dev per circa 100 s** (`kubectl scale --replicas=0`, poi ripristinato a 1; smoke test superato dopo).
+
+| Istante | Frontend | cartservice | Home dallo shop |
+|---|---|---|---|
+| 20 s | `1/1` | `1/1` | **500** |
+| 45 s | `1/1` | `0/1`, 1 riavvio | 500 |
+| 75-100 s | `1/1` | `1/1` (Redis ancora spento) | 500 |
+
+- Il frontend è rimasto `Ready` per tutta la prova mentre la home dava 500: conferma che le sue probe non vedono i backend.
+- Il cartservice non è uscito dal servizio perché `NotServing`: gli eventi mostrano `Readiness probe failed: ... health rpc did not complete within 5s`, cioè **timeout** della chiamata di health. Poiché la liveness usa la stessa chiamata, il pod è stato riavviato una volta. È tornato `Ready` a Redis ancora spento, quindi **`Ready` non significa "funziona"**.
+- **Causa dei timeout: non indagata.** L'ipotesi è che richieste bloccate su Redis saturino il servizio (che gira emulato), ma non l'ho dimostrato.
+
+**Decisione: nessuna probe modificata.** Una readiness che dipende da un backend condiviso toglie tutte le repliche dal servizio insieme, quando Redis cade, e il frontend risponderebbe 503 al posto di 500 senza che nulla migliori. Il rilevamento dei guasti sta nelle metriche, non nelle probe: tasso di 5xx del frontend (§1) e `redis_up` (§5), da trasformare in alert in fase 7.
+
+Altre osservazioni, non corrette:
+
+- Il riavvio del cartservice quando Redis cade non cura nulla (il problema è Redis); è un buon scenario per la fase 8.
+- Nessuna `startupProbe`: i servizi lenti all'avvio (JVM, .NET emulati) si affidano a `initialDelaySeconds: 60` della liveness, aggiunto dal workaround. Quando la fase 6 toglie l'emulazione e il workaround, **le probe vanno riverificate sulle immagini native**.
+- Il loadgenerator non ha probe (non espone porte).
+- Il frontend ha `timeoutSeconds: 1`: non ha dato problemi in circa 19 ore (0 riavvii), ma non l'ho messo sotto carico.
+
+## 8. Ancora da fare in fase 5
+
+Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch degli altri servizi e la riverifica delle probe sono in fase 6.

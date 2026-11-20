@@ -47,6 +47,18 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/args
         value: ["--requirepass", "$(REDIS_PASSWORD)"]
+  # frontend: senza ENV_PLATFORM il codice stampa "env platform is either empty or invalid"
+  # con fmt.Println (testo, non JSON) a ogni render della home, sporcando i log strutturati.
+  # "local" è il valore che il codice userebbe comunque: la pagina non cambia.
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: ENV_PLATFORM
+          value: local
   # redis-cart: sidecar redis_exporter (fase 5). Parla con Redis su localhost, quindi non
   # serve nessuna NetworkPolicy tra i due; riusa il Secret della password tramite la
   # variabile d'ambiente REDIS_PASSWORD (così non compare tra gli argomenti del processo).

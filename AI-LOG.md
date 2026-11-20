@@ -91,6 +91,19 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-10 | 4 | implementazione | Claude Code | Fase 4: `flux bootstrap github`, Kustomization per infrastruttura, dev e prod con SOPS, `scripts/flux-bootstrap.sh`, `docs/gitops.md`, ADR 0003 | mod. | Eseguito su k3d: Flux sano, dev e prod gestiti da Flux, decifratura SOPS verificata, commit su `main` → dev aggiornato senza `kubectl apply`, rollback con `git revert`. Dettagli sotto |
 | AI-11 | 5 | implementazione | Claude Code | Fase 5 (solo frontend): metriche Prometheus `/metrics`, Dockerfile, build locale arm64/amd64, `docs/observability.md` | mod. | Test Go e `docker run` con le restrizioni del pod; scoperto e corretto un bug di build multi-arch ereditato da upstream. Poi provato in k3d dopo il push su `main`: serie con il traffico del loadgenerator. Dettagli sotto |
 | AI-12 | 5 | implementazione | Claude Code | Fase 5: sidecar `redis_exporter` in `redis-cart`, porta `metrics` sul Service | acc. | Provato in locale (password giusta/sbagliata), dry-run lato server, poi nel cluster dopo il push: `redis_up 1`, smoke test superato. Dettagli sotto |
+| AI-13 | 5 | operations | Claude Code | Fase 5: verifica dei log JSON a runtime e delle probe, con prova di guasto (Redis spento in dev) | mod. | Log controllati riga per riga su 12 pod; guasto provato nel cluster e ripristinato; una sola correzione di configurazione (`ENV_PLATFORM`), nessuna probe modificata. Dettagli sotto |
+
+**AI-13, esito (2026-11-20, fase 5):**
+
+- *Eseguito:* controllo che ogni riga di log (ultime 200 per pod, 12 pod di dev) sia JSON valido; lettura dell'health check di ogni servizio; prova di guasto con `kubectl scale deploy/redis-cart --replicas=0` per circa 100 s, poi ripristino a 1 e smoke test; patch `ENV_PLATFORM=local` sul frontend; `docs/observability.md` §6-7.
+- *Verificato:* cartservice e loadgenerator non emettono JSON (come previsto dal codice); i campi non sono uniformi (`severity` in 9 servizi su 10, tempo come `timestamp`/`time`/`instant`); con Redis spento il frontend resta `Ready` mentre la home dà 500; il cartservice va in timeout sulla probe (non `NotServing`), viene riavviato una volta dalla liveness e torna `Ready` a Redis ancora spento.
+- *Errori e sorprese:*
+  1. **Ho dedotto male dal codice:** dal costruttore di `HealthCheckService` (riceve lo store Redis) avevo concluso che il cartservice controllasse Redis e avevo previsto `NotServing`. Leggendo il metodo, `Ping()` è `try { return true; }`. Poi la prova dal vivo ha mostrato un terzo comportamento (timeout), che non avevo previsto. Corretta la lettura; senza la prova avrei scritto una spiegazione falsa.
+  2. **Riga non JSON nel frontend** (`fmt.Println` a ogni home), non prevista dall'analisi di fase 1, che guardava solo la configurazione di logrus. Risolta con configurazione, non con codice.
+  3. In `docs/architecture.md` c'era una riga obsoleta ("Redis senza password"): la password c'è dalla fase 3. Corretta.
+- *Decisione:* nessuna probe modificata; il rilevamento dei guasti passa da metriche e alert (fase 7), non da readiness che dipendono da backend condivisi. Ragionamento mio, non provato in un confronto.
+- *Limiti dichiarati:* causa dei timeout del cartservice non indagata (ipotesi: saturazione per richieste appese su Redis); log controllati solo in condizioni normali, non nei percorsi di errore; `timeoutSeconds: 1` del frontend non provato sotto carico; il test ha lasciato un riavvio nel contatore del cartservice e ha azzerato i carrelli in dev; le probe vanno riverificate quando la fase 6 toglie il workaround arm64.
+- *Da fare da me:* valutare se accetto "nessuna probe modificata" e se vale la pena correggere `Ping()` del cartservice o i campi dei log (fuori perimetro).
 
 **AI-12, esito (2026-11-20, fase 5):**
 

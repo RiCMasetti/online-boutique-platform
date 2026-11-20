@@ -180,8 +180,8 @@ Conseguenza per la fase 3: le policy upstream limitano il traffico **in ingresso
 | Ordine di avvio | Nessuno bloccante (client gRPC lazy). Solo `loadgenerator` attende il frontend. | — |
 | Variabili `*_SERVICE_ADDR` | Una variabile vuota o assente fa crashare il pod; una sbagliata dà errori solo a runtime. | Fase 3 (overlay), fase 8 (scenari) |
 | Redis non persistente | Carrelli persi al riavvio del pod. | Limite dichiarato (fase 3) |
-| Redis senza replica né password | Un solo punto di guasto, nessuna autenticazione. | Limite dichiarato (fase 3) |
-| Probe che non guardano le dipendenze | Pod `Ready` con backend in errore (es. cartservice con Redis giù). | Osservabilità (fase 5 e 7) |
+| Redis senza replica | Un solo punto di guasto. La password c'è dalla fase 3. | Limite dichiarato (fase 3) |
+| Probe che non guardano le dipendenze | Pod `Ready` con backend in errore (es. cartservice con Redis giù). **Verificato in fase 5** (`docs/observability.md` §7): con Redis spento il frontend resta `Ready` e la home dà 500; il `Ping()` del cartservice è uno stub che non controlla Redis. | Osservabilità (fase 7) |
 | Risorse | Circa 1,6 vCPU e 1,4 GiB di requests per ambiente, più il loadgenerator. Due ambienti (dev e prod) nello stesso cluster raddoppiano il conto, più lo stack Prometheus. | Fase 3: ridurre repliche e risorse in `dev`; verificare la RAM di Docker |
 | Immagini | La base usa `us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/*:v0.10.7`, immagini pubbliche upstream. `redis:alpine` non ha un tag fissato. | Fase 3: fissare i tag con il component `container-images-tag`; fase 5-6: immagine propria su GHCR |
 | `frontend-external` | Service `LoadBalancer` non necessario con Traefik. | Fase 2-3 |
