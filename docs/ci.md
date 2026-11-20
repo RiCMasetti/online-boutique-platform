@@ -51,8 +51,9 @@ I workflow upstream `ci-pr.yaml` e `ci-main.yaml` sono stati sostituiti: provava
 | Build `arm64` di shippingservice e cartservice con i Dockerfile corretti | eseguita in locale, binari `aarch64` |
 | Simulazione del passo `kustomize edit set image` | eseguita su una copia: 11 immagini GHCR nel rendering di dev, resto invariato |
 | Sintassi YAML dei workflow | letta con un parser YAML; **`actionlint` non eseguito** |
-| Esecuzione dei workflow su GitHub, build di tutti gli 11 servizi, durata, push, rollout in dev | **non ancora eseguiti** |
-| Build `amd64` | non provata (la macchina è arm64); la proverà il runner |
+| Run della PR #2 su GitHub (2026-11-20): `checks` (hadolint, manifests, test) e le 22 build (11 servizi × amd64/arm64, senza push) | **tutti passati**; build da 46 s (recommendationservice arm64) a 161 s (cartservice arm64), cache fredda |
+| Build `amd64` | passata sui runner |
+| Push su GHCR, job `merge`, `scan`, `update-dev`, rollout in dev | **non ancora eseguiti** (partono solo dopo il merge su `main`) |
 
 **Correzione trovata dai controlli:** `go test` su `checkoutservice` falliva (`go vet`: `status.Errorf(codes.Internal, err.Error())` usa un messaggio come stringa di formato). Corretto in `src/checkoutservice/main.go` con `status.Error`: stesso comportamento, ma un `%` nel messaggio non viene più interpretato. Upstream non lo vedeva perché non testava quel servizio.
 
