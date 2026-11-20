@@ -94,6 +94,16 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-13 | 5 | operations | Claude Code | Fase 5: verifica dei log JSON a runtime e delle probe, con prova di guasto (Redis spento in dev) | mod. | Log controllati riga per riga su 12 pod; guasto provato nel cluster e ripristinato; una sola correzione di configurazione (`ENV_PLATFORM`, verificata nel cluster), nessuna probe modificata. Dettagli sotto |
 | AI-14 | 6 | implementazione | Claude Code | Fase 6: workflow GitHub Actions (controlli, build multi-arch su runner nativi, push GHCR, tag in dev), Dockerfile di tutti gli 11 servizi, `docs/ci.md` | mod. | Controlli eseguiti in locale; sulla PR #2 passano `checks` e le 22 build senza push. Push GHCR, manifest e rollout **non ancora eseguiti**. Dettagli sotto |
 | AI-15 | 6 | operations | Claude Code | Fase 6: preparazione della promozione di prod (immagini GHCR, via `arm64-workaround`) e PR `main → prod` | mod. | PR preparate, **non unite**: nessuna verifica in prod ancora. Dettagli sotto |
+| AI-16 | 7 | implementazione | Claude Code | Fase 7: kube-prometheus-stack via HelmRelease, ServiceMonitor, alert, dashboard, NetworkPolicy per Prometheus, ADR 0004 | mod. | Scritto e validato in modo statico (`helm template`, `kustomize build`, `kubeconform`); **non installato nel cluster**, query e alert non provati. Dettagli sotto |
+
+**AI-16, stack di osservabilità (2026-11-20, solo lavoro statico):**
+
+- *Eseguito:* HelmRelease di kube-prometheus-stack 93.6.0, due Kustomization Flux separate, ServiceMonitor per frontend e redis-cart, quattro alert, dashboard di 10 pannelli (JSON generato con uno script, committato solo il JSON), Secret SOPS per Grafana, aperture NetworkPolicy per Prometheus, controlli in CI.
+- *Verificato:* `helm template` con i miei valori (nessun errore; Ingress, Secret e sidecar delle dashboard come previsto; nessun DaemonSet), `kustomize build`, `kubeconform` (i CRD sono saltati: senza schema), JSON valido.
+- *Scelte dedotte, non provate:* niente node-exporter (mount `/` nei nodi k3d: l'ho ricordato come problema noto, non l'ho provato); componenti k3s disattivati; `dependsOn` separati perché lo stack non blocchi dev e prod (ragionamento, non un guasto visto).
+- *Un errore che avrei potuto fare:* `RedisDown` con solo `redis_up == 0` non sarebbe scattato spegnendo `redis-cart` (pod ed exporter spariscono e la serie con loro). L'ho notato ripensando alla prova di AI-13; ora c'è una seconda condizione su kube-state-metrics. Idem per `FrontendUnavailable`. Da confermare con il guasto vero.
+- *Limiti dichiarati:* nulla di tutto questo è stato eseguito nel cluster: non so se l'HelmRelease si installa, se i target sono `up`, se le query della dashboard restituiscono dati, né se gli alert scattano. Il "done" della fase 7 non è raggiunto.
+- *Da fare da me:* leggere i valori dell'HelmRelease e le regole prima del merge; il merge installa lo stack sul nodo condiviso.
 
 **AI-15, preparazione della promozione di prod (2026-11-20, non ancora eseguita):**
 
