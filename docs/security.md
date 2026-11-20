@@ -31,9 +31,9 @@ Controlli negativi eseguiti (k3s applica le policy davvero):
 - La chiave **privata** è in `~/.config/sops/age/keys.txt` (permessi 600), **fuori dal repo**. Non va mai committata né incollata in prompt o log. `.gitignore` esclude `keys.txt`, `*.agekey`, `age.key` e `*.dec.yaml`.
 - Le password sono state generate con `openssl rand -hex 24` e cifrate senza mai passare dall'output. Dev e prod hanno valori diversi.
 - Per creare un Secret nuovo: scrivi il file in chiaro **fuori dal repo**, cifralo con `sops --encrypt --filename-override deploy/overlays/<env>/<nome>.enc.yaml ...`, elimina il file in chiaro.
-- **Fino alla fase 4** gli overlay si applicano con `scripts/apply-local.sh <dev|prod>`: decifra i Secret con la chiave locale e li passa a `kubectl` via pipe, senza scrivere file in chiaro. Con Flux lo script non serve più.
+- **Con Flux (fase 4)** i Secret li decifra il controller; `scripts/apply-local.sh <dev|prod>` (decifra con la chiave locale e passa a `kubectl` via pipe) serve solo su un cluster senza Flux e non va usato insieme a Flux.
 
-**Custodia della chiave.** Se si perde `keys.txt`, i Secret nel repo non sono più decifrabili e vanno rigenerati. Va fatto un backup fuori dal repo. Ogni cluster nuovo ha bisogno della stessa chiave (in fase 4 diventa il Secret `sops-age` in `flux-system`, creato da file locale e mai committato).
+**Custodia della chiave.** Se si perde `keys.txt`, i Secret nel repo non sono più decifrabili e vanno rigenerati. Va fatto un backup fuori dal repo. Ogni cluster nuovo ha bisogno della stessa chiave (in Flux è il Secret `sops-age` in `flux-system`, creato da `scripts/flux-bootstrap.sh` a partire dal file locale e mai committato).
 
 ### Chi fa cosa: SOPS, Kustomize e Flux
 
@@ -43,13 +43,13 @@ Controlli negativi eseguiti (k3s applica le policy davvero):
 |---|---|---|
 | Cifratura | `sops --encrypt` | `.sops.yaml`: la regola con `path_regex` sceglie la chiave pubblica age e i campi da cifrare (`data`, `stringData`). Il nome del file deve corrispondere a `deploy/.*\.enc\.yaml$` (per questo si usa `--filename-override`). |
 | Build | `kustomize build` | Tratta `redis-auth.enc.yaml` come un normale Secret in `resources:`. La chiave `sops:` in più (destinatario age e MAC) passa inalterata. |
-| Decifratura | `sops --decrypt` (oggi `scripts/apply-local.sh`), in futuro il controller Flux | Il blocco `sops:` dentro il file e la **chiave privata**. Non `.sops.yaml`. |
+| Decifratura | il controller Flux (`spec.decryption` delle Kustomization); senza Flux, `scripts/apply-local.sh` con `sops --decrypt` | Il blocco `sops:` dentro il file e la **chiave privata**. Non `.sops.yaml`. |
 
 Conseguenze pratiche:
 - `kubectl apply -k` non è utilizzabile sugli overlay: applicherebbe il testo cifrato come valore del Secret (da qui `apply-local.sh`, che decifra e applica via pipe).
 - `kubeconform -strict` rifiuta il Secret cifrato per la chiave sconosciuta `sops`: nella validazione va escluso (`-skip Secret`).
-- Con Flux (fase 4) la `Kustomization` dichiarerà `spec.decryption: {provider: sops, secretRef: {name: sops-age}}` e il controller decifrerà con la chiave privata presente nel cluster.
-- **Da verificare in fase 4:** che il controller decifri correttamente il Secret dopo il `kustomize build` con le patch usate qui. Non è stato provato né riletto nella documentazione di Flux.
+- Con Flux le `Kustomization` `boutique-dev` e `boutique-prod` dichiarano `spec.decryption: {provider: sops, secretRef: {name: sops-age}}` e il controller decifra con la chiave privata presente nel cluster.
+- **Verificato in fase 4:** Flux decifra `redis-cart-auth` dopo il `kustomize build` con le patch degli overlay (valore in chiaro di 48 caratteri in dev e prod). Non è stata riletta la documentazione di Flux sull'ordine build/decifratura: la prova è empirica.
 - Esiste KSOPS, un generatore che integra SOPS dentro Kustomize con un plugin esterno. Non è adottato: per questo progetto la decifratura nativa di Flux è più semplice.
 
 ## 3. Limiti residui
