@@ -7,34 +7,34 @@ kind: Component
 images:
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/adservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/adservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/cartservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/cartservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/checkoutservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/checkoutservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/currencyservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/currencyservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/emailservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/emailservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/frontend
   newName: ghcr.io/ricmasetti/online-boutique-platform/frontend
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/loadgenerator
   newName: ghcr.io/ricmasetti/online-boutique-platform/loadgenerator
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/paymentservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/paymentservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/productcatalogservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/productcatalogservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/recommendationservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/recommendationservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/shippingservice
   newName: ghcr.io/ricmasetti/online-boutique-platform/shippingservice
-  newTag: e7eaa5b8b502
+  newTag: dbb2081430a5
