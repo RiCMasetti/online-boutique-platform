@@ -1,0 +1,53 @@
+# CI delle pull request verso main: controlli, test e build (senza push) dei servizi toccati.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    uses: ./.github/workflows/checks.yaml
+
+  # Servizi con modifiche in src/<servizio>/ (o tutti, se cambiano i workflow di build).
+  changed:
+    runs-on: ubuntu-24.04
+    outputs:
+      services: ${{ steps.diff.outputs.services }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          set -eu
+          all='adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice'
+          files="$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")"
+          if echo "$files" | grep -qE '^\.github/workflows/(build-images|ci)\.yaml$'; then
+            sel="$all"
+          else
+            sel=""
+            for s in $all; do
+              echo "$files" | grep -q "^src/$s/" && sel="$sel $s"
+            done
+          fi
+          json="$(printf '%s\n' $sel | grep -v '^$' | jq -R . | jq -sc .)"
+          echo "servizi da costruire: $json"
+          echo "services=$json" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: changed
+    uses: ./.github/workflows/build-images.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push: false
+      services: ${{ needs.changed.outputs.services }}

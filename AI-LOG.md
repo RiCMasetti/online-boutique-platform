@@ -92,6 +92,22 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-11 | 5 | implementazione | Claude Code | Fase 5 (solo frontend): metriche Prometheus `/metrics`, Dockerfile, build locale arm64/amd64, `docs/observability.md` | mod. | Test Go e `docker run` con le restrizioni del pod; scoperto e corretto un bug di build multi-arch ereditato da upstream. Poi provato in k3d dopo il push su `main`: serie con il traffico del loadgenerator. Dettagli sotto |
 | AI-12 | 5 | implementazione | Claude Code | Fase 5: sidecar `redis_exporter` in `redis-cart`, porta `metrics` sul Service | acc. | Provato in locale (password giusta/sbagliata), dry-run lato server, poi nel cluster dopo il push: `redis_up 1`, smoke test superato. Dettagli sotto |
 | AI-13 | 5 | operations | Claude Code | Fase 5: verifica dei log JSON a runtime e delle probe, con prova di guasto (Redis spento in dev) | mod. | Log controllati riga per riga su 12 pod; guasto provato nel cluster e ripristinato; una sola correzione di configurazione (`ENV_PLATFORM`, verificata nel cluster), nessuna probe modificata. Dettagli sotto |
+| AI-14 | 6 | implementazione | Claude Code | Fase 6: workflow GitHub Actions (controlli, build multi-arch su runner nativi, push GHCR, tag in dev), Dockerfile di tutti gli 11 servizi, `docs/ci.md` | mod. | Controlli eseguiti in locale; sulla PR #2 passano `checks` e le 22 build senza push. Push GHCR, manifest e rollout **non ancora eseguiti**. Dettagli sotto |
+
+**AI-14, esito (2026-11-20, fase 6, solo lavoro locale):**
+
+- *Eseguito:* quattro workflow (`checks`, `build-images`, `ci`, `release`), rimozione dei due workflow upstream di test, modifica dei Dockerfile di dieci servizi (via i default `amd64`), component `dev-images`, `docs/ci.md`.
+- *Verificato in locale:* hadolint sugli 11 Dockerfile; `kustomize build` + `kubeconform` su dev e prod; `go test` dei quattro servizi Go; build `linux/arm64` di shippingservice e cartservice con `file` sul binario (`aarch64`); simulazione di `kustomize edit set image` su una copia del repository.
+- *Errori e sorprese:*
+  1. **Il piano partiva da un'ipotesi sbagliata:** avevo in mente un build multi-arch con QEMU. Leggendo i Dockerfile Python ho visto che lo stadio `builder` gira sulla piattaforma di build e viene copiato nell'immagine finale, quindi in cross-build l'immagine arm64 avrebbe avuto librerie amd64. Scelti runner nativi (`ubuntu-24.04-arm`). Ragionamento dedotto dal codice, **non provato** con un build cross-arch reale.
+  2. **kubeconform bocciava il Secret SOPS** (chiave `sops` non ammessa dallo schema): non l'avevo previsto, l'ho scoperto eseguendo il controllo. Soluzione: `-skip Secret`, dichiarata nei commenti.
+  3. **`go test` su checkoutservice falliva** per `go vet` su un `status.Errorf` con messaggio non costante: bug upstream, corretto con `status.Error`. Fuori dal perimetro iniziale, ma il test lo richiedeva.
+  4. **`kustomize edit` cancella i commenti** dell'overlay: ho spostato il tag di dev in un component dedicato dopo averlo visto nella simulazione.
+  5. **L'`images:` degli overlay aveva una voce non valida** (undici nomi separati da spazi in un solo `name`): non faceva nulla perché la base fissa già `v0.10.7`. Rimossa; rendering di dev e prod invariato (`diff` vuoto).
+  6. L'installazione di `actionlint` (`go install`) è stata bloccata dal sistema di permessi; non l'ho aggirata. I workflow sono stati letti con un parser YAML, non validati con `actionlint`.
+- *Esito sulla PR #2:* `checks` e tutte le 22 build (runner arm64 inclusi, build `amd64` inclusa) passate al primo tentativo, 46-161 s con cache fredda; il job `merge` è saltato come previsto.
+- *Limiti dichiarati:* i job di push (`merge`, `scan`, `update-dev`) non sono mai stati eseguiti; il passo di push per digest, il manifest e il controllo delle piattaforme sono quindi non provati; i pacchetti GHCR vanno resi pubblici a mano e questo non è verificabile da qui; il job `update-dev` e il controllo del pull anonimo sono testati solo per lettura.
+- *Da fare da me:* leggere i workflow riga per riga prima del primo push su `main` (pubblicano pacchetti e committano su `main`); decidere se accetto il commit automatico del tag invece di una PR.
 
 **AI-13, esito (2026-11-20, fase 5):**
 

@@ -1,0 +1,13 @@
+# Immagini dell'ambiente dev. Questo file è riscritto dal workflow `release`
+# (`kustomize edit set image`, commit automatico dopo il push su main): non modificarlo a mano
+# per cambiare tag, e non metterci commenti, che `kustomize edit` cancella.
+# Flux vede il commit e fa il rollout in dev (docs/ci.md).
+#
+# Fino al primo rilascio della CI: frontend con /metrics costruito in locale e importato in
+# k3d con `k3d image import` (fase 5); gli altri servizi restano a v0.10.7 della base.
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+images:
+  - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/frontend
+    newName: boutique/frontend
+    newTag: phase5

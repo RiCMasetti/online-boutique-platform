@@ -1,0 +1,84 @@
+# Controlli statici e test, riusati da ci.yaml (PR) e release.yaml (main).
+# Fase 6: hadolint, kustomize build + kubeconform sugli overlay, test Go e .NET.
+name: checks
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+env:
+  HADOLINT_IMAGE: ghcr.io/hadolint/hadolint:v2.15.1
+  KUBECONFORM_VERSION: v0.8.0
+
+jobs:
+  hadolint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      # Tutti gli 11 Dockerfile: si fallisce sugli errori. I warning dei Dockerfile upstream
+      # (DL3018 apk non pinnato, DL3042, DL3045...) non sono stati corretti: non è lavoro
+      # di questo progetto e un cambio di versione dei pacchetti apk rompe la build.
+      - name: hadolint (soglia error, tutti i servizi)
+        run: |
+          set -eu
+          for f in src/*/Dockerfile src/cartservice/src/Dockerfile; do
+            case "$f" in src/shoppingassistantservice/*) continue ;; esac
+            echo "::group::$f"
+            docker run --rm -i "$HADOLINT_IMAGE" hadolint --failure-threshold error - < "$f"
+            echo "::endgroup::"
+          done
+      # Il frontend è il Dockerfile riscritto da noi (fase 5): qui si fallisce anche sui warning.
+      - name: hadolint (soglia warning, frontend)
+        run: docker run --rm -i "$HADOLINT_IMAGE" hadolint --failure-threshold warning - < src/frontend/Dockerfile
+
+  manifests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Installa kubeconform
+        run: |
+          set -eu
+          curl -fsSL -o kubeconform.tgz \
+            "https://github.com/yannh/kubeconform/releases/download/${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz"
+          tar -xzf kubeconform.tgz kubeconform
+          sudo install kubeconform /usr/local/bin/kubeconform
+      # `kustomize build` su dev e prod, poi validazione degli schemi Kubernetes.
+      # `-skip Secret`: il Secret cifrato con SOPS ha la chiave `sops` al livello radice, che lo
+      # schema Kubernetes non ammette (Flux la rimuove decifrando). È l'unico Secret negli overlay.
+      - name: kustomize build + kubeconform
+        run: |
+          set -eu
+          for env in dev prod; do
+            echo "::group::$env"
+            kustomize build "deploy/overlays/$env" > "/tmp/$env.yaml"
+            kubeconform -strict -skip Secret -summary -kubernetes-version 1.33.0 "/tmp/$env.yaml"
+            echo "::endgroup::"
+          done
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-go@v7.1.0
+        with:
+          go-version: '1.27'
+          cache-dependency-path: src/*/go.sum
+      - uses: actions/setup-dotnet@v6.1.0
+        env:
+          DOTNET_INSTALL_DIR: ./.dotnet
+        with:
+          dotnet-version: '10.0'
+      - name: Go test (servizi con test)
+        timeout-minutes: 10
+        run: |
+          set -eu
+          for svc in frontend productcatalogservice shippingservice checkoutservice; do
+            echo "::group::$svc"
+            (cd "src/$svc" && go test ./...)
+            echo "::endgroup::"
+          done
+      - name: C# test (cartservice)
+        timeout-minutes: 10
+        run: dotnet test src/cartservice/

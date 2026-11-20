@@ -65,6 +65,8 @@ curl localhost:8080/metrics
 
 ## 4. Immagine nel cluster, in attesa di GHCR
 
+_Aggiornamento fase 6: la CI pubblica le immagini su GHCR e aggiorna dev ([docs/ci.md](ci.md)); finché non gira, vale quanto segue._
+
 Fino alla fase 6 non c'è un registry: l'immagine si importa con `k3d image import boutique/frontend:phase5 -c boutique` e l'overlay dev la referenzia (`images:` in `deploy/overlays/dev/kustomization.yaml`). Il tag non è `latest`, quindi il pull policy è `IfNotPresent` e kubelet usa l'immagine importata. **Limite:** funziona solo su questo cluster e se l'immagine è stata importata; su un cluster nuovo il pod va in `ErrImagePull` finché non si rifà l'import. Prod resta sull'immagine upstream.
 
 ## 5. Metriche di Redis (`redis_exporter`)

@@ -30,6 +30,10 @@ Restano esclusi `redis:alpine` e l'immagine `busybox` dell'init container, già 
 - **Visibilità su GHCR:** i pacchetti devono essere pubblici perché chiunque possa scaricarli senza login. Da verificare e impostare alla prima push.
 - **Demo senza rete:** il piano B della fase 11 scarica le immagini sulla macchina di demo e le importa con `k3d image import`, che usa l'architettura locale.
 
+## Aggiornamento (fase 6, 2026-11-20)
+
+La CI costruisce ogni servizio su **runner nativi** (`ubuntu-24.04` e `ubuntu-24.04-arm`, gratuiti per il fork pubblico) e unisce i risultati in un manifest, invece di usare QEMU o la cross-compilazione: nei Dockerfile Python lo stadio `builder` gira sulla piattaforma di build e i suoi pacchetti finiscono nell'immagine finale, quindi un cross-build avrebbe prodotto librerie della piattaforma sbagliata (dedotto dai Dockerfile, non provato). I default `amd64` sono stati rimossi da tutti gli 11 Dockerfile. Dettagli in [docs/ci.md](../ci.md).
+
 ## Transizione
 
 Fino alla fase 6 gli overlay usano le immagini upstream con i workaround già presenti in `deploy/overlays/dev`. A fine fase 6 si cambiano registry e tag (component `container-images-registry` e `container-images-tag`) e si rimuovono i workaround. L'ADR va rivista se la build di qualche servizio non è fattibile su una delle due architetture: in quel caso si documenta l'eccezione.
