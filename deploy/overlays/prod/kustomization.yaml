@@ -13,7 +13,7 @@ components:
   - ../../../kustomize/components/non-public-frontend
   - ../../../kustomize/components/without-loadgenerator
   - ../../components/network-policies
-  - ../../components/arm64-workaround   # da rimuovere con le immagini multi-arch (ADR 0002)
+  - ../../components/arm64-workaround   # da rimuovere quando prod passa alle immagini GHCR (promozione, docs/ci.md §5)
 labels:
   - pairs:
       environment: prod
