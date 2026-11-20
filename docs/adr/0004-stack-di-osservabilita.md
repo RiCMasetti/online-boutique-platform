@@ -1,7 +1,7 @@
 # ADR 0004 — Stack di osservabilità: kube-prometheus-stack, installato da Flux
 
 - **Data:** 2026-11-20
-- **Stato:** accettata (installazione da verificare nel cluster: vedi `docs/observability.md` §8)
+- **Stato:** accettata; installata e verificata in dev il 2026-11-20 (vedi `docs/observability.md` §8)
 - **Collegata a:** ADR 0001 (Prometheus come scelta di metriche), ADR 0003, `docs/gitops.md`
 
 ## Contesto
@@ -24,7 +24,7 @@ Le metriche esistono già (frontend `/metrics`, `redis_exporter`, fase 5). Servo
 
 ## Trade-off e limiti
 
-- **Peso:** Prometheus, Grafana, Alertmanager, operator e kube-state-metrics sullo stesso nodo dell'applicazione. Richieste dichiarate: circa 0,3 CPU e 0,8 GiB.
+- **Peso:** Prometheus, Grafana, Alertmanager, operator e kube-state-metrics sullo stesso nodo dell'applicazione. Richieste dichiarate: circa 0,4 CPU e 0,9 GiB. **Misurato:** Grafana, con le venti dashboard predefinite del chart, ha usato fino a 4,8 core per circa 15 minuti all'avvio (il 95% del cluster) ed è stato riavviato dalla liveness; le dashboard predefinite sono state disattivate e Grafana ha ora un limite di CPU. Il resto dello stack consuma poco (Prometheus circa 65 mCPU e 600 MiB a regime).
 - **Nessun volume:** i dati di Prometheus stanno in un `emptyDir` con retention di 2 giorni; si perdono al riavvio del pod. Accettabile per questa challenge, non per un uso reale.
 - **Niente node-exporter:** monta `/` dell'host con propagazione, che nei nodi k3d dà errore (problema noto, non provato qui). Conseguenza: nessuna metrica dell'host (disco, rete della VM); restano cAdvisor e kube-state-metrics per i pod.
 - **Componenti di k3s non monitorati:** etcd, scheduler, controller-manager e kube-proxy sono disattivati; k3s non li espone sulle porte che il chart si aspetta, e i target risulterebbero "down".

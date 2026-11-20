@@ -123,10 +123,10 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 **Done quando:** una PR fa girare i controlli; il merge produce un'immagine e un rollout in `dev`.
 
 ### Fase 7 — Stack di osservabilità (M) — Osservabilità 8%
-- [ ] `HelmRelease` di kube-prometheus-stack gestito da Flux.
-- [ ] `ServiceMonitor` per frontend e Redis exporter.
-- [ ] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis.
-- [ ] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile).
+- [x] `HelmRelease` di kube-prometheus-stack gestito da Flux. _Installato; Grafana saturava la CPU all'avvio, correzione in PR (`docs/observability.md` §8)._
+- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy._
+- [x] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis. _Query verificate con dati reali in dev; la pagina non è stata guardata._
+- [x] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile). _Quattro regole; con Redis spento in dev sono scattati `RedisDown` e `FrontendHigh5xxRate`. `FrontendUnavailable` e `PodCrashLooping` non esercitate._
 
 **Done quando:** dashboard leggibile e almeno un alert che scatta nello scenario di failure.
 
