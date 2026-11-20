@@ -62,12 +62,15 @@ jobs:
       matrix:
         service: ${{ fromJSON(needs.config.outputs.services) }}
     steps:
+      # I riferimenti GHCR devono essere in minuscolo (github.repository ha le maiuscole).
+      - id: ref
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.service }}:${{ needs.build.outputs.tag }}" >> "$GITHUB_OUTPUT"
       - uses: aquasecurity/trivy-action@v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
-          image-ref: ghcr.io/${{ github.repository }}/${{ matrix.service }}:${{ needs.build.outputs.tag }}
+          image-ref: ${{ steps.ref.outputs.image }}
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '0'
