@@ -77,7 +77,7 @@ spec:
             cpu: 10m
             memory: 32Mi
           limits:
-            memory: 64Mi
+            memory: 128Mi
 
     prometheusOperator:
       resources:
@@ -112,10 +112,17 @@ spec:
           cpu: 50m
           memory: 128Mi
         limits:
-          memory: 256Mi
-      # Le dashboard del progetto sono ConfigMap con l'etichetta `grafana_dashboard: "1"`
-      # nel namespace monitoring (observability/config).
+          memory: 384Mi
+      # Sidecar (dashboard e datasource): le dashboard del progetto sono ConfigMap con
+      # l'etichetta `grafana_dashboard: "1"` nel namespace monitoring (observability/config).
+      # I sidecar hanno un limite di memoria: senza, il chart non ne imposta.
       sidecar:
+        resources:
+          requests:
+            cpu: 10m
+            memory: 48Mi
+          limits:
+            memory: 128Mi
         dashboards:
           enabled: true
           label: grafana_dashboard

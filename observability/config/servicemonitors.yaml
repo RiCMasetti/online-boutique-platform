@@ -18,6 +18,13 @@ spec:
     - port: http
       path: /metrics
       interval: 15s
+      # Il Service `frontend-external` (LoadBalancer, rimosso dai due overlay) ha la stessa
+      # etichetta `app: frontend` e la stessa porta `http`: se tornasse, ogni pod sarebbe
+      # raccolto due volte. Si tiene solo il Service `frontend`.
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_service_name]
+          regex: frontend
+          action: keep
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor

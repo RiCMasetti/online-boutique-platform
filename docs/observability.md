@@ -165,4 +165,8 @@ Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch de
 
 **Alert** (dev e prod): `FrontendUnavailable` (nessuna replica pronta, 1 min), `PodCrashLooping` (CrashLoopBackOff, 2 min), `RedisDown` (`redis_up 0` oppure nessuna replica pronta, 1 min), `FrontendHigh5xxRate` (oltre il 5% di 5xx con almeno 0,2 richieste/s, 2 min). `FrontendUnavailable` e `RedisDown` usano kube-state-metrics e non `up`: se il pod sparisce la serie `up` scompare e `up == 0` non scatterebbe.
 
+**Test degli alert (eseguiti, senza cluster):** `observability/config/tests/rules_test.yaml` prova la logica delle quattro regole con `promtool test rules` su serie sintetiche (Redis giù con pod non pronto → un solo alert; Redis spento senza serie dell'exporter; Redis sano; frontend senza repliche; 5xx alti con e senza traffico; crash loop). Girano anche in CI. Verificato che i test possono fallire: con la vecchia espressione di `RedisDown` (senza aggregazione per namespace) scattavano due alert per un solo guasto. Non provano il cluster né che le metriche abbiano quelle etichette.
+
+**Limite noto degli alert:** se un Deployment viene cancellato, kube-state-metrics non emette più la serie `kube_deployment_status_replicas_available` e `FrontendUnavailable`/`RedisDown` non scattano (servirebbe un `absent()`). Flux ricrea l'oggetto al giro successivo.
+
 **Da verificare nel cluster** (e da annotare qui quando fatto): installazione dello stack da Flux, target `up` di frontend e redis-cart in dev e prod, query della dashboard con dati reali, un alert che scatta con un guasto provocato.

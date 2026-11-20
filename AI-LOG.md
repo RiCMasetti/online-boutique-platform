@@ -102,6 +102,14 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 - *Verificato:* `helm template` con i miei valori (nessun errore; Ingress, Secret e sidecar delle dashboard come previsto; nessun DaemonSet), `kustomize build`, `kubeconform` (i CRD sono saltati: senza schema), JSON valido.
 - *Scelte dedotte, non provate:* niente node-exporter (mount `/` nei nodi k3d: l'ho ricordato come problema noto, non l'ho provato); componenti k3s disattivati; `dependsOn` separati perché lo stack non blocchi dev e prod (ragionamento, non un guasto visto).
 - *Un errore che avrei potuto fare:* `RedisDown` con solo `redis_up == 0` non sarebbe scattato spegnendo `redis-cart` (pod ed exporter spariscono e la serie con loro). L'ho notato ripensando alla prova di AI-13; ora c'è una seconda condizione su kube-state-metrics. Idem per `FrontendUnavailable`. Da confermare con il guasto vero.
+- *Revisione indipendente della PR (skill code-review, livello medio) e cosa ne ho fatto:*
+  1. **Accettato, con prova:** `RedisDown` poteva produrre due alert per un solo guasto (Redis giù e pod non pronto insieme: due serie con etichette diverse). Corretto aggregando per namespace; verificato con `promtool test rules` che con la vecchia espressione scattano due alert e con la nuova uno. Il rilievo era giusto e io non ci avevo pensato.
+  2. **Accettato:** il ServiceMonitor del frontend ammetteva anche `frontend-external` se fosse tornato (stessa etichetta e porta): ora si tiene solo il Service `frontend`.
+  3. **Accettato:** limiti di memoria: Alertmanager 128Mi (64Mi era stretto), Grafana 384Mi, sidecar di Grafana con limite (il chart non lo mette).
+  4. **Accettato:** validazione delle regole in CI con `promtool` (sintassi e test), oltre al solo JSON della dashboard.
+  5. **Scartato:** "versione 93.6.0 non verificata": l'ho scaricata con `helm pull` dal repository e renderizzata. "Timeout di 5 minuti di observability-config": il timeout riguarda la sua applicazione, non l'attesa del `dependsOn`.
+  6. **Riconosciuto, non corretto:** un Deployment cancellato non fa scattare `FrontendUnavailable` né `RedisDown` (nessuna serie): documentato come limite.
+  Inoltre la PR era in conflitto con `main` (solo `AI-LOG.md`, dopo il merge della #8): risolto.
 - *Limiti dichiarati:* nulla di tutto questo è stato eseguito nel cluster: non so se l'HelmRelease si installa, se i target sono `up`, se le query della dashboard restituiscono dati, né se gli alert scattano. Il "done" della fase 7 non è raggiunto.
 - *Da fare da me:* leggere i valori dell'HelmRelease e le regole prima del merge; il merge installa lo stack sul nodo condiviso.
 

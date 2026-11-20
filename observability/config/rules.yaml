@@ -29,11 +29,15 @@ spec:
             description: "Il container {{ $labels.container }} è in CrashLoopBackOff da oltre due minuti."
         # Come sopra, due condizioni: l'exporter segnala `redis_up 0` (Redis giù ma pod vivo)
         # oppure non c'è nessuna replica pronta (pod assente, e con lui l'exporter).
+        # Entrambe sono aggregate per namespace: se Redis cade e il pod diventa non pronto
+        # scattano insieme, e con le stesse etichette `or` le fonde in un solo alert.
+        # Limite: se il Deployment viene cancellato, kube-state-metrics non emette più la
+        # serie e nessuna delle due condizioni scatta (servirebbe un `absent()`).
         - alert: RedisDown
           expr: |
-            (redis_up{namespace=~"boutique-(dev|prod)"} == 0)
+            (min by (namespace) (redis_up{namespace=~"boutique-(dev|prod)"}) == 0)
             or
-            (kube_deployment_status_replicas_available{namespace=~"boutique-(dev|prod)", deployment="redis-cart"} == 0)
+            (sum by (namespace) (kube_deployment_status_replicas_available{namespace=~"boutique-(dev|prod)", deployment="redis-cart"}) == 0)
           for: 1m
           labels:
             severity: critical
