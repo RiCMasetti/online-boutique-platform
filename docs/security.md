@@ -70,7 +70,7 @@ Dichiarati apertamente: non sono difetti nascosti, ma confini di ciò che è sta
 **Ambienti e immagini**
 - `dev` e `prod` condividono cluster, nodo e control plane: nessun isolamento reale (ADR 0001). L'isolamento di rete tra i namespace è verificato, quello di risorse no.
 - Le immagini sono upstream, senza firma e fissate per tag (non per digest); `redis:alpine` non ha un tag fissato. Con le immagini multi-arch proprie (ADR 0002) si potrà fissare per digest e scansionare con Trivy (fase 6).
-- Il workaround per arm64 (probe liveness con ritardo di 60 s e timeout di 5 s, limiti di memoria a 256Mi) è in `deploy/components/arm64-workaround` e **indebolisce** il rilevamento dei guasti in entrambi gli ambienti. Scompare con le immagini multi-arch.
+- Il workaround per arm64 (probe liveness con ritardo di 60 s e timeout di 5 s, limiti di memoria a 256Mi) indeboliva il rilevamento dei guasti. È stato tolto da dev con le immagini multi-arch e da prod con la promozione alle immagini GHCR; il component è stato eliminato.
 
 **Processo**
 - PSA `restricted` rifiuta qualunque pod futuro non conforme (per esempio un exporter come sidecar senza `securityContext`): va tenuto conto nelle fasi 5-7.

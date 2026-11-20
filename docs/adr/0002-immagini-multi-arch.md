@@ -20,7 +20,7 @@ Restano esclusi `redis:alpine` e l'immagine `busybox` dell'init container, già 
 
 - Mantiene la compatibilità in ambiente di sviluppo su arm64 e amd64, senza emulazione e senza workaround.
 - Elimina le patch provvisorie dell'overlay dev (probe rilassate, limiti di memoria alzati).
-- I Dockerfile upstream sono già parametrizzati (`--platform=$BUILDPLATFORM`, `TARGETARCH`), quindi non vanno riscritti.
+- I Dockerfile upstream usano `--platform=$BUILDPLATFORM` e `TARGETARCH`, ma **non vanno bene così com'erano** (correzione del 2026-11-20, fase 5): dichiarano i default `ARG BUILDPLATFORM=linux/amd64` (in tutti e 12 i Dockerfile) e `ARG TARGETARCH=amd64` (frontend, checkoutservice, productcatalogservice, shippingservice, cartservice), che sovrascrivono i valori di buildx. Provato sul frontend: `docker buildx build --platform linux/arm64` produceva un binario x86-64 (identico a quello amd64) e compilava in emulazione (5 minuti invece di circa 50 secondi). Nel frontend i default sono stati rimossi; vanno rimossi in tutti gli altri in fase 6, e la CI deve controllare l'architettura del binario, non solo l'etichetta dell'immagine.
 - La CI della fase 6 deve comunque costruire e pubblicare almeno il frontend: estenderla a undici servizi con una matrice ha un costo marginale basso.
 
 ## Trade-off
@@ -29,6 +29,10 @@ Restano esclusi `redis:alpine` e l'immagine `busybox` dell'init container, già 
 - **Tempo di build:** la prima build è lunga, soprattutto per Java e .NET. Da misurare in fase 6. Costruire arm64 con QEMU in CI è lento: da verificare nella documentazione di GitHub se i runner arm64 sono disponibili e gratuiti per un fork pubblico, prima di contarci.
 - **Visibilità su GHCR:** i pacchetti devono essere pubblici perché chiunque possa scaricarli senza login. Da verificare e impostare alla prima push.
 - **Demo senza rete:** il piano B della fase 11 scarica le immagini sulla macchina di demo e le importa con `k3d image import`, che usa l'architettura locale.
+
+## Aggiornamento (fase 6, 2026-11-20)
+
+La CI costruisce ogni servizio su **runner nativi** (`ubuntu-24.04` e `ubuntu-24.04-arm`, gratuiti per il fork pubblico) e unisce i risultati in un manifest, invece di usare QEMU o la cross-compilazione: nei Dockerfile Python lo stadio `builder` gira sulla piattaforma di build e i suoi pacchetti finiscono nell'immagine finale, quindi un cross-build avrebbe prodotto librerie della piattaforma sbagliata (dedotto dai Dockerfile, non provato). I default `amd64` sono stati rimossi da tutti gli 11 Dockerfile. Dettagli in [docs/ci.md](../ci.md).
 
 ## Transizione
 

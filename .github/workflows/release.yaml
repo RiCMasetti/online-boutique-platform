@@ -1,0 +1,127 @@
+# Dopo il merge su main: controlli, build e push su GHCR dei servizi, scansione Trivy
+# (non bloccante) e aggiornamento del tag nel component deploy/components/dev-images.
+# Flux rileva il commit e fa il rollout.
+# La promozione a prod resta una PR main -> prod (ADR 0003): qui prod non si tocca.
+name: release
+
+on:
+  push:
+    branches: [main]
+    # Non si riparte per le modifiche a documentazione, overlay o cluster: il commit
+    # automatico del tag (con GITHUB_TOKEN) non innesca comunque altri workflow.
+    paths:
+      - 'src/**'
+      - '.github/workflows/release.yaml'
+      - '.github/workflows/build-images.yaml'
+      - '.github/workflows/checks.yaml'
+  workflow_dispatch:
+
+# Un solo rilascio alla volta, in coda: due run parallele si contenderebbero il commit del tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SERVICES: '["adservice","cartservice","checkoutservice","currencyservice","emailservice","frontend","loadgenerator","paymentservice","productcatalogservice","recommendationservice","shippingservice"]'
+
+jobs:
+  config:
+    runs-on: ubuntu-24.04
+    outputs:
+      services: ${{ steps.s.outputs.services }}
+    steps:
+      - id: s
+        run: echo "services=$SERVICES" >> "$GITHUB_OUTPUT"
+
+  checks:
+    uses: ./.github/workflows/checks.yaml
+
+  build:
+    needs: [config, checks]
+    uses: ./.github/workflows/build-images.yaml
+    permissions:
+      contents: read
+      packages: write
+    with:
+      push: true
+      services: ${{ needs.config.outputs.services }}
+
+  # Plus, non bloccante: segnala le vulnerabilità nel riepilogo del job.
+  scan:
+    needs: [config, build]
+    runs-on: ubuntu-24.04
+    continue-on-error: true
+    permissions:
+      contents: read
+      packages: read
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(needs.config.outputs.services) }}
+    steps:
+      # I riferimenti GHCR devono essere in minuscolo (github.repository ha le maiuscole).
+      - id: ref
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.service }}:${{ needs.build.outputs.tag }}" >> "$GITHUB_OUTPUT"
+      - uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          image-ref: ${{ steps.ref.outputs.image }}
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '0'
+          format: table
+
+  update-dev:
+    needs: [config, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          ref: main
+      # Se i pacchetti GHCR sono privati, il cluster non può scaricarli: aggiornare il tag
+      # romperebbe dev (ImagePullBackOff). Il controllo avviene SENZA login.
+      - name: Controlla che le immagini siano pubbliche (pull anonimo)
+        run: |
+          set -eu
+          repo="${GITHUB_REPOSITORY,,}"
+          tag="${{ needs.build.outputs.tag }}"
+          for s in $(echo "$SERVICES" | jq -r '.[]'); do
+            if ! docker buildx imagetools inspect "ghcr.io/$repo/$s:$tag" >/dev/null 2>&1; then
+              echo "::error::ghcr.io/$repo/$s:$tag non è leggibile senza login. Imposta il pacchetto come pubblico (Package settings > Danger Zone > Change visibility)."
+              exit 1
+            fi
+          done
+      - name: Aggiorna il tag nel component dev-images
+        run: |
+          set -eu
+          repo="${GITHUB_REPOSITORY,,}"
+          tag="${{ needs.build.outputs.tag }}"
+          upstream="us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo"
+          cd deploy/components/dev-images
+          for s in $(echo "$SERVICES" | jq -r '.[]'); do
+            kustomize edit set image "$upstream/$s=ghcr.io/$repo/$s:$tag"
+          done
+      - name: Commit e push (con ritentativi se main è avanzato)
+        run: |
+          set -eu
+          if git diff --quiet; then
+            echo "Nessuna modifica: il tag è già aggiornato."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "deploy(dev): immagini ${{ needs.build.outputs.tag }}" \
+            -m "Aggiornamento automatico dal workflow release (commit ${GITHUB_SHA})."
+          for i in 1 2 3; do
+            git push origin HEAD:main && exit 0
+            git pull --rebase origin main
+          done
+          echo "::error::push non riuscito dopo 3 tentativi"
+          exit 1

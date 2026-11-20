@@ -94,24 +94,31 @@ L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in
 
 ### Fase 5 — Immagine custom, Dockerfile e metriche (M-L) — Implementazione 15%, Osservabilità 8%
 Upstream non espone metriche Prometheus, quindi serve una modifica mirata (consentita dalla traccia).
-- [ ] **Metrica applicativa:** nel `frontend` (Go) aggiungi `promhttp` con `/metrics` e un contatore/istogramma delle richieste HTTP. Modifica minima e documentata nel diff.
-- [ ] Dockerfile (multi-stage) e build riproducibile; variabili d'ambiente documentate; esecuzione locale con `docker run`.
+- [x] **Metrica applicativa:** nel `frontend` (Go) aggiungi `promhttp` con `/metrics` e un contatore/istogramma delle richieste HTTP. Modifica minima e documentata nel diff.
+- [x] Dockerfile (multi-stage) e build riproducibile; variabili d'ambiente documentate; esecuzione locale con `docker run`.
 - [ ] Build **multi-arch** (`linux/amd64` + `linux/arm64`, `docker buildx`) del frontend, da estendere a tutti gli 11 servizi in fase 6. Le immagini upstream sono solo amd64 (ADR 0002).
-- [ ] **Metriche di supporto:** `redis_exporter` come sidecar o deployment separato; probe del frontend con blackbox exporter (opzionale).
-- [ ] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
-- [ ] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.
+  - _Parziale (2026-11-20): build locale `arm64` e `amd64` separate, binari verificati con `file`; manca il manifest multi-arch unico e il push su GHCR (fase 6). Vedi `docs/observability.md`._
+- [x] **Metriche di supporto:** `redis_exporter` come sidecar o deployment separato; probe del frontend con blackbox exporter (opzionale).
+- [x] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
+- [x] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.
 
 **Piano B se il tempo stringe:** solo `redis_exporter` + kube-state-metrics + cAdvisor, spiegando perché non hai toccato il frontend.
 
 **Done quando:** Prometheus mostra la metrica del frontend con traffico del loadgenerator.
 
 ### Fase 6 — CI GitHub Actions (M) — Automazione 10%
-- [ ] Lint: `hadolint` sui Dockerfile modificati, `kubeconform` e `kustomize build` su dev e prod.
-- [ ] Test: `go test` del frontend (e dei servizi toccati).
-- [ ] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
+- [x] Lint: `hadolint` sui Dockerfile modificati, `kubeconform` e `kustomize build` su dev e prod.
+  - _Verificato in locale e sulla PR #2 (2026-11-20). Vedi `docs/ci.md`._
+- [x] Test: `go test` del frontend (e dei servizi toccati).
+  - _Come sopra. Corretto un `status.Errorf` in checkoutservice che faceva fallire `go vet`._
+- [x] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
+  - _Runner arm64 nativi disponibili sul fork pubblico; build di 11 servizi × 2 architetture passate sulla PR (senza push); push da provare. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
 - [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
-- [ ] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
-- [ ] Scansione immagine (Trivy) come plus, non bloccante.
+  - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: PR di promozione preparata (immagini GHCR, workaround tolto), da unire e verificare (`docs/ci.md` §5)._
+- [x] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
+  - _Commit automatico in `deploy/components/dev-images`: provato, Flux ha fatto il rollout in dev (12/12 pronti, smoke test ok)._
+- [x] Scansione immagine (Trivy) come plus, non bloccante.
+  - _Funzionante dal run 44731010825 (bug di maiuscole corretto in PR #3); risultati in `docs/ci.md` §4, non analizzati._
 
 **Done quando:** una PR fa girare i controlli; il merge produce un'immagine e un rollout in `dev`.
 

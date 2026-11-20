@@ -12,13 +12,9 @@ components:
   # con Traefik sulla porta 80. L'accesso passa dall'Ingress.
   - ../../../kustomize/components/non-public-frontend
   - ../../components/network-policies
-  - ../../components/arm64-workaround   # da rimuovere con le immagini multi-arch (ADR 0002)
+  - ../../components/dev-images         # tag delle immagini, aggiornato dalla CI (workflow release)
 labels:
   - pairs:
       environment: dev
     includeSelectors: false
     includeTemplates: true
-# Tag delle immagini: in fase 6 la CI aggiorna questi valori (kustomize edit set image).
-images:
-  - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice
-    newTag: v0.10.7
