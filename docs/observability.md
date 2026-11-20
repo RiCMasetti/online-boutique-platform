@@ -57,7 +57,11 @@ curl localhost:8080/metrics
 | Richieste a `/`, `/product/ABC`, `/robots.txt`, `/static/...`, URL inesistente | serie con `route` a template; 500 contati (backend finti); 404 non contata |
 | `kubectl kustomize` su dev e prod | dev usa l'immagine locale, prod invariato; 51 risorse valide con `kubeconform` |
 
-**Non provato:** il frontend nuovo dentro k3d con il traffico del loadgenerator; la build `amd64` eseguita (solo ispezionato il binario, la macchina è arm64); `go vet` (segnala 72 avvisi `copylocks` già presenti in `money/` e `handlers.go`, nessuno nei file nuovi).
+| Push su `main` → Flux applica `7d27ffc9` a dev; rollout del frontend con `boutique/frontend:phase5` | pod `1/1 Running`, shop 200 dall'Ingress |
+| `/metrics` via `kubectl port-forward` dopo circa 20 s di loadgenerator | serie per `/product/{id}`, `/cart`, `/`, `/setCurrency`, `/cart/checkout`, nessun 5xx |
+| Log del frontend in k3d (`kubectl logs`) | JSON (logrus), come da analisi di fase 1 |
+
+**Non provato:** Prometheus che raccoglie la metrica (fase 7: il port-forward aggira la NetworkPolicy, quindi non dimostra che la scrape funzioni); la build `amd64` eseguita (solo ispezionato il binario, la macchina è arm64); `go vet` (segnala 72 avvisi `copylocks` già presenti in `money/` e `handlers.go`, nessuno nei file nuovi).
 
 ## 4. Immagine nel cluster, in attesa di GHCR
 
