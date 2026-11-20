@@ -53,9 +53,26 @@ I workflow upstream `ci-pr.yaml` e `ci-main.yaml` sono stati sostituiti: provava
 | Sintassi YAML dei workflow | letta con un parser YAML; **`actionlint` non eseguito** |
 | Run della PR #2 su GitHub (2026-11-20): `checks` (hadolint, manifests, test) e le 22 build (11 servizi × amd64/arm64, senza push) | **tutti passati**; build da 46 s (recommendationservice arm64) a 161 s (cartservice arm64), cache fredda |
 | Build `amd64` | passata sui runner |
-| Push su GHCR, job `merge`, `scan`, `update-dev`, rollout in dev | **non ancora eseguiti** (partono solo dopo il merge su `main`) |
+| Push su GHCR, job `merge`, `update-dev`, rollout in dev (run 44726672556, tag `06974f96d9ae`) | passati; adservice amd64 ha richiesto un secondo tentativo per un `429` di Maven Central |
+| Job `scan` (Trivy) | al primo run falliva ovunque (riferimento con maiuscole, PR #3); dal run 44731010825 funziona e riporta vulnerabilità |
+| Dev senza `arm64-workaround` (run 44731010825, tag `e7eaa5b8b502`) | 12 deployment pronti, 0 restart, smoke test superato, memoria tra 11 e 74 MiB (limiti 128-450 MiB) |
 
 **Correzione trovata dai controlli:** `go test` su `checkoutservice` falliva (`go vet`: `status.Errorf(codes.Internal, err.Error())` usa un messaggio come stringa di formato). Corretto in `src/checkoutservice/main.go` con `status.Error`: stesso comportamento, ma un `%` nel messaggio non viene più interpretato. Upstream non lo vedeva perché non testava quel servizio.
+
+### Trivy: prima scansione (2026-11-20, tag `e7eaa5b8b502`, solo HIGH e CRITICAL con fix disponibile)
+
+Il job stampa più tabelle per immagine (sistema operativo e librerie); i totali sotto sono quelli stampati, senza distinguere quale sia quale.
+
+| Servizio | Totali stampati |
+|---|---|
+| adservice | 17 (16 HIGH, 1 CRITICAL); 8 (6 HIGH, 2 CRITICAL) |
+| cartservice | 4 (HIGH) |
+| checkoutservice, frontend, productcatalogservice, shippingservice | 6 (HIGH) ciascuno |
+| currencyservice, paymentservice | 5 (HIGH); 23 (22 HIGH, 1 CRITICAL) |
+| emailservice, recommendationservice | 12 (HIGH); 19 (17 HIGH, 2 CRITICAL) |
+| loadgenerator | 12 (HIGH); 17 (14 HIGH, 3 CRITICAL) |
+
+Non sono state analizzate né corrette: sono dipendenze e immagini di base upstream. Lo scan non è bloccante per scelta (il piano lo vuole come plus). Un'eventuale correzione (aggiornare immagini di base e dipendenze) è fuori dal perimetro di questa fase.
 
 ## 5. Dopo il primo rilascio
 
@@ -63,6 +80,6 @@ I workflow upstream `ci-pr.yaml` e `ci-main.yaml` sono stati sostituiti: provava
 - [ ] Rollout in dev su arm64 senza emulazione: pod `Ready`, smoke test superato.
 - [x] Primo rilascio (run 44726672556, tag `06974f96d9ae`): pacchetti pubblici, `update-dev` ha committato il tag, rollout in dev su arm64 senza emulazione (12 deployment, 0 restart, smoke test superato).
 - [x] Workaround arm64 tolto da **dev**. Resta in **prod**, che usa ancora le immagini upstream amd64: togliendolo lì senza passare alle immagini GHCR prod si romperebbe.
-- [ ] Riverificare probe e memoria di dev sotto carico, senza workaround (lo chiede AI-13).
+- [x] Probe e memoria di dev senza workaround, con il loadgenerator attivo: 0 restart, nessun OOM, memoria molto sotto i limiti. Restano eventi `Unhealthy` (15) di **readiness** con timeout di 1 s, concentrati negli avvii dei pod durante i rollout (nodo occupato); nessuna ha portato a un riavvio. Non misurato: comportamento con più traffico del loadgenerator o a regime dopo ore.
 - [ ] Promuovere a prod con una PR che porta il blocco `images` nell'overlay prod.
 - [ ] Annotare durata dei build e dei runner arm64 (ADR 0002 lo chiede).
