@@ -93,15 +93,17 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-12 | 5 | implementazione | Claude Code | Fase 5: sidecar `redis_exporter` in `redis-cart`, porta `metrics` sul Service | acc. | Provato in locale (password giusta/sbagliata), dry-run lato server, poi nel cluster dopo il push: `redis_up 1`, smoke test superato. Dettagli sotto |
 | AI-13 | 5 | operations | Claude Code | Fase 5: verifica dei log JSON a runtime e delle probe, con prova di guasto (Redis spento in dev) | mod. | Log controllati riga per riga su 12 pod; guasto provato nel cluster e ripristinato; una sola correzione di configurazione (`ENV_PLATFORM`, verificata nel cluster), nessuna probe modificata. Dettagli sotto |
 | AI-14 | 6 | implementazione | Claude Code | Fase 6: workflow GitHub Actions (controlli, build multi-arch su runner nativi, push GHCR, tag in dev), Dockerfile di tutti gli 11 servizi, `docs/ci.md` | mod. | Controlli eseguiti in locale; sulla PR #2 passano `checks` e le 22 build senza push. Push GHCR, manifest e rollout **non ancora eseguiti**. Dettagli sotto |
-| AI-15 | 6 | operations | Claude Code | Fase 6: preparazione della promozione di prod (immagini GHCR, via `arm64-workaround`) e PR `main → prod` | mod. | PR preparate, **non unite**: nessuna verifica in prod ancora. Dettagli sotto |
+| AI-15 | 6 | operations | Claude Code | Fase 6: promozione di prod (immagini GHCR, via `arm64-workaround`) e PR `main → prod` | mod. | PR #6 e #7 unite da me (autore); Flux ha applicato `prod@7a723188`; 0 restart, smoke test ok. Eventi `Unhealthy` negli avvii. Dettagli sotto |
 
-**AI-15, preparazione della promozione di prod (2026-11-20, non ancora eseguita):**
+**AI-15, promozione di prod (2026-11-20):**
 
 - *Preparato:* overlay prod con le 10 immagini GHCR nel tag già verificato in dev (`e7eaa5b8b502`), eliminato il component `arm64-workaround`, documentazione allineata. Due PR: una verso `main`, poi `main → prod` come bozza.
 - *Verificato prima:* `kustomize build` di dev e prod, `kubeconform`; diff del rendering di prod prima e dopo (solo immagini, probe e limiti del workaround); diff del rendering di **ciò che prod esegue oggi** (branch `prod`) contro quello nuovo.
 - *Sorpresa:* la promozione `main → prod` porta in prod anche modifiche non legate alle immagini (sidecar `redis_exporter`, porta `metrics` sul Service, `ENV_PLATFORM`), perché prod era rimasta indietro dalla fase 4. L'avevo descritta come "solo il tag"; il diff del rendering l'ha corretta. Inoltre `docs/gitops.md` diceva che la PR #1 non era stata unita, ma `prod` era già a `88fec121`: documento obsoleto, corretto.
 - *Capacità:* requests al 60% di CPU e al 30% di memoria sul nodo con dev e prod accesi; il rollout di prod non dovrebbe saturarlo. Stima da `kubectl describe node`, non provata.
-- *Limiti dichiarati:* nulla è stato applicato a prod; il comportamento delle probe da 1 s in prod (2 repliche di frontend e productcatalog) è da verificare dopo il merge.
+- *Esito dopo il merge (fatto da me, l'autore del repository):* Flux ha applicato `prod@7a723188`; 11 deployment pronti, immagini `e7eaa5b8b502`, 0 restart; smoke test superato; `/metrics` e `redis_up 1` verificati. Flux ha mostrato per qualche minuto "Reconciliation in progress" sulla revisione vecchia: all'inizio mi sembrava un blocco, era l'attesa dei controlli di salute (verificato rileggendo lo stato).
+- *Non perfetto:* eventi `Unhealthy` su quasi tutti i servizi durante il rollout, anche di liveness a 1 s (adservice, emailservice, recommendationservice), senza riavvii. Il nodo era occupato da 13 pod nuovi più dev; il margine delle probe da 1 s è quello che la fase 8 metterà alla prova.
+- *Limiti dichiarati:* rollback di prod con `git revert` non provato; prod osservata per pochi minuti, non a regime.
 
 **AI-14, esito (2026-11-20, fase 6, solo lavoro locale):**
 
