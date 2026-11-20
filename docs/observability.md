@@ -1,6 +1,6 @@
 # Osservabilità
 
-Stato a fine fase 5: il frontend espone metriche Prometheus. Prometheus, Grafana e gli alert arrivano in fase 7; `redis_exporter` e il resto della fase 5 non sono ancora fatti (vedi §5).
+Stato a fine fase 5: il frontend espone metriche Prometheus. Prometheus, Grafana e gli alert arrivano in fase 7. Il resto della fase 5 è elencato in §6.
 
 ## 1. Metriche del frontend
 
@@ -67,6 +67,21 @@ curl localhost:8080/metrics
 
 Fino alla fase 6 non c'è un registry: l'immagine si importa con `k3d image import boutique/frontend:phase5 -c boutique` e l'overlay dev la referenzia (`images:` in `deploy/overlays/dev/kustomization.yaml`). Il tag non è `latest`, quindi il pull policy è `IfNotPresent` e kubelet usa l'immagine importata. **Limite:** funziona solo su questo cluster e se l'immagine è stata importata; su un cluster nuovo il pod va in `ErrImagePull` finché non si rifà l'import. Prod resta sull'immagine upstream.
 
-## 5. Ancora da fare in fase 5
+## 5. Metriche di Redis (`redis_exporter`)
 
-`redis_exporter`; verifica dei log JSON a runtime (`kubectl logs`); controllo delle probe; build multi-arch degli altri servizi (fase 6).
+Sidecar nel pod `redis-cart` ([deploy/base/kustomization.yaml](../deploy/base/kustomization.yaml)), quindi uguale in dev e prod. Il Service `redis-cart` espone anche la porta `metrics` (9121), che userà il ServiceMonitor della fase 7.
+
+Scelte:
+
+- **Sidecar e non deployment separato:** parla con Redis su `localhost:6379`, quindi non serve aprire la NetworkPolicy di Redis (che ammette solo cartservice); riusa il Secret `redis-cart-auth` e segue il ciclo di vita di Redis.
+- **Password da variabile d'ambiente** (`REDIS_PASSWORD`, dal Secret): non compare tra gli argomenti del processo, a differenza di `--requirepass` di Redis (limite già dichiarato in `docs/security.md`).
+- **Immagine** `oliver006/redis_exporter:v1.97.0` fissata con digest dell'indice multi-arch (amd64, arm64, armv7), utente 59000, `readOnlyRootFilesystem`, `drop ALL`, richieste 10m/16Mi e limiti 50m/64Mi.
+- **Probe su `/health`:** verificato in locale che risponde 200 anche con password sbagliata, quindi l'exporter non viene riavviato quando Redis è giù: è proprio il caso in cui deve segnalarlo.
+- **Segnale per l'alert (fase 7):** con password sbagliata (o Redis irraggiungibile) l'exporter risponde ma con `redis_up 0` e `redis_exporter_last_scrape_error{err="WRONGPASS ..."} 1`. Le metriche utili sono `redis_up`, `redis_connected_clients`, `redis_memory_used_bytes`, `redis_commands_processed_total`, `redis_db_keys`.
+- **Limite:** Redis non ha `maxmemory` e il limite del container è 256Mi: con `noeviction` (rilevato dall'exporter) un riempimento si traduce in OOMKilled, non in errori di scrittura. Utile per lo scenario di failure della fase 8.
+
+Provato in locale (container Docker con `redis:alpine --requirepass`): password giusta → `redis_up 1` e metriche; password sbagliata → `redis_up 0` con errore esplicito. Il `kustomize build` di dev e prod contiene sidecar e porta del Service, `kubeconform` valido, e il dry-run lato server in k3d accetta Deployment e Service (Pod Security `restricted` inclusa). Vedi §3 per l'esito nel cluster.
+
+## 6. Ancora da fare in fase 5
+
+Verifica dei log JSON degli altri servizi a runtime (`kubectl logs`); controllo delle probe; blackbox exporter per il frontend (opzionale, non fatto); build multi-arch degli altri servizi (fase 6).

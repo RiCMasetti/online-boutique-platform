@@ -47,6 +47,67 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/args
         value: ["--requirepass", "$(REDIS_PASSWORD)"]
+  # redis-cart: sidecar redis_exporter (fase 5). Parla con Redis su localhost, quindi non
+  # serve nessuna NetworkPolicy tra i due; riusa il Secret della password tramite la
+  # variabile d'ambiente REDIS_PASSWORD (così non compare tra gli argomenti del processo).
+  # Immagine multi-arch (amd64/arm64), fissata per tag e digest dell'indice; utente 59000.
+  # Le probe usano /health, che risponde 200 anche se Redis è giù: se dipendessero da Redis
+  # l'exporter verrebbe riavviato proprio quando serve a segnalare il guasto (`redis_up 0`).
+  - target:
+      kind: Deployment
+      name: redis-cart
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/-
+        value:
+          name: redis-exporter
+          image: oliver006/redis_exporter:v1.97.0@sha256:f5f903fbe77571d455ede0453b084d6840bc62fc105efac001034421cab83b99
+          env:
+            - name: REDIS_ADDR
+              value: redis://localhost:6379
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-cart-auth
+                  key: password
+          ports:
+            - name: metrics
+              containerPort: 9121
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: metrics
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            privileged: false
+            readOnlyRootFilesystem: true
+  # La porta `metrics` sul Service serve al ServiceMonitor della fase 7.
+  - target:
+      kind: Service
+      name: redis-cart
+    patch: |-
+      - op: add
+        path: /spec/ports/-
+        value:
+          name: metrics
+          port: 9121
+          targetPort: metrics
   # cartservice: la password viaggia nella stringa di connessione di StackExchange.Redis.
   # REDIS_PASSWORD deve precedere REDIS_ADDR perché $(VAR) funzioni.
   - target:
