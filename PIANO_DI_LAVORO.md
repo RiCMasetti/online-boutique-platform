@@ -94,9 +94,10 @@ L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in
 
 ### Fase 5 — Immagine custom, Dockerfile e metriche (M-L) — Implementazione 15%, Osservabilità 8%
 Upstream non espone metriche Prometheus, quindi serve una modifica mirata (consentita dalla traccia).
-- [ ] **Metrica applicativa:** nel `frontend` (Go) aggiungi `promhttp` con `/metrics` e un contatore/istogramma delle richieste HTTP. Modifica minima e documentata nel diff.
-- [ ] Dockerfile (multi-stage) e build riproducibile; variabili d'ambiente documentate; esecuzione locale con `docker run`.
+- [x] **Metrica applicativa:** nel `frontend` (Go) aggiungi `promhttp` con `/metrics` e un contatore/istogramma delle richieste HTTP. Modifica minima e documentata nel diff.
+- [x] Dockerfile (multi-stage) e build riproducibile; variabili d'ambiente documentate; esecuzione locale con `docker run`.
 - [ ] Build **multi-arch** (`linux/amd64` + `linux/arm64`, `docker buildx`) del frontend, da estendere a tutti gli 11 servizi in fase 6. Le immagini upstream sono solo amd64 (ADR 0002).
+  - _Parziale (2026-11-20): build locale `arm64` e `amd64` separate, binari verificati con `file`; manca il manifest multi-arch unico e il push su GHCR (fase 6). Vedi `docs/observability.md`._
 - [ ] **Metriche di supporto:** `redis_exporter` come sidecar o deployment separato; probe del frontend con blackbox exporter (opzionale).
 - [ ] Log strutturati: verifica che i servizi emettano JSON (upstream usa logrus/JSON in molti servizi) e documenta quali.
 - [ ] Probe liveness/readiness: verifica quelle upstream (`/_healthz` per il frontend, probe gRPC per gli altri) e correggi se necessario.

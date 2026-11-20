@@ -20,7 +20,7 @@ Restano esclusi `redis:alpine` e l'immagine `busybox` dell'init container, già 
 
 - Mantiene la compatibilità in ambiente di sviluppo su arm64 e amd64, senza emulazione e senza workaround.
 - Elimina le patch provvisorie dell'overlay dev (probe rilassate, limiti di memoria alzati).
-- I Dockerfile upstream sono già parametrizzati (`--platform=$BUILDPLATFORM`, `TARGETARCH`), quindi non vanno riscritti.
+- I Dockerfile upstream usano `--platform=$BUILDPLATFORM` e `TARGETARCH`, ma **non vanno bene così com'erano** (correzione del 2026-11-20, fase 5): dichiarano i default `ARG BUILDPLATFORM=linux/amd64` (in tutti e 12 i Dockerfile) e `ARG TARGETARCH=amd64` (frontend, checkoutservice, productcatalogservice, shippingservice, cartservice), che sovrascrivono i valori di buildx. Provato sul frontend: `docker buildx build --platform linux/arm64` produceva un binario x86-64 (identico a quello amd64) e compilava in emulazione (5 minuti invece di circa 50 secondi). Nel frontend i default sono stati rimossi; vanno rimossi in tutti gli altri in fase 6, e la CI deve controllare l'architettura del binario, non solo l'etichetta dell'immagine.
 - La CI della fase 6 deve comunque costruire e pubblicare almeno il frontend: estenderla a undici servizi con una matrice ha un costo marginale basso.
 
 ## Trade-off
