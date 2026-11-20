@@ -55,7 +55,6 @@ patches:
       - op: replace
         path: /spec/template/spec/containers/0/resources/limits/memory
         value: 256Mi
-# Tag delle immagini: prod si aggiorna solo con PR o tag esplicito (fase 4).
-images:
-  - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/adservice cartservice checkoutservice currencyservice emailservice frontend loadgenerator paymentservice productcatalogservice recommendationservice shippingservice
-    newTag: v0.10.7
+# Immagini: la base le fissa a v0.10.7 (upstream, solo amd64). Quando le immagini GHCR
+# saranno verificate in dev, la promozione a prod è una PR che aggiunge qui il blocco
+# `images` con il tag scelto (ADR 0003): la CI non tocca mai questo file.

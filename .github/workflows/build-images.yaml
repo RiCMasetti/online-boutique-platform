@@ -1,0 +1,155 @@
+# Build delle immagini, riusato da ci.yaml (solo build) e release.yaml (build + push su GHCR).
+#
+# Ogni servizio si costruisce su un runner NATIVO per ciascuna architettura (amd64 e arm64),
+# poi un job crea il manifest multi-arch. Non si usa QEMU né la cross-compilazione: i
+# Dockerfile Python copiano nello stadio finale i pacchetti installati nello stadio
+# `builder`, che gira sulla piattaforma di build; in cross-build l'immagine arm64 conterrebbe
+# wheel amd64 (ADR 0002). Con i runner nativi build e destinazione coincidono.
+name: build-images
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        description: "Pubblica su GHCR (true) o solo build (false)"
+        type: boolean
+        required: true
+      services:
+        description: "Array JSON dei servizi da costruire"
+        type: string
+        required: true
+    outputs:
+      tag:
+        description: "Tag delle immagini pubblicate (primi 12 caratteri dello SHA)"
+        value: ${{ jobs.merge.outputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: inputs.services != '[]'
+    name: build ${{ matrix.service }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(inputs.services) }}
+        arch: [amd64, arm64]
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Nome immagine e contesto di build
+        run: |
+          set -eu
+          owner_repo="${GITHUB_REPOSITORY,,}"
+          echo "IMAGE=ghcr.io/${owner_repo}/${{ matrix.service }}" >> "$GITHUB_ENV"
+          ctx="src/${{ matrix.service }}"
+          # cartservice ha il Dockerfile in una sottocartella.
+          [ "${{ matrix.service }}" = "cartservice" ] && ctx="src/cartservice/src"
+          echo "CONTEXT=$ctx" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.8.0
+        if: inputs.push
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # Prima build nel daemon locale: serve a controllare l'architettura dell'immagine
+      # prima di pubblicarla.
+      - name: Build (locale)
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          platforms: linux/${{ matrix.arch }}
+          load: true
+          tags: local/${{ matrix.service }}:${{ matrix.arch }}
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }}
+          cache-to: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }},mode=max
+      - name: Controlla l'architettura dell'immagine
+        run: |
+          set -eu
+          got="$(docker image inspect -f '{{.Architecture}}' "local/${{ matrix.service }}:${{ matrix.arch }}")"
+          echo "architettura: $got (attesa: ${{ matrix.arch }})"
+          [ "$got" = "${{ matrix.arch }}" ]
+      # Seconda build, tutta dalla cache del passo precedente: pubblica per digest, senza tag.
+      - name: Push per digest
+        id: push
+        if: inputs.push
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          platforms: linux/${{ matrix.arch }}
+          outputs: type=image,name=${{ env.IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}-${{ matrix.arch }}
+      - name: Salva il digest
+        if: inputs.push
+        run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          digest="${{ steps.push.outputs.digest }}"
+          touch "${{ runner.temp }}/digests/${digest#sha256:}"
+      - uses: actions/upload-artifact@v7.0.2
+        if: inputs.push
+        with:
+          name: digests-${{ matrix.service }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  merge:
+    if: inputs.push && inputs.services != '[]'
+    name: manifest ${{ matrix.service }}
+    needs: build
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJSON(inputs.services) }}
+    steps:
+      - id: vars
+        run: |
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}/${{ matrix.service }}" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v8.0.2
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-${{ matrix.service }}-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Crea il manifest multi-arch
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          set -eu
+          image="${{ steps.vars.outputs.image }}"
+          docker buildx imagetools create \
+            --tag "$image:${{ steps.vars.outputs.tag }}" \
+            $(printf "$image@sha256:%s " *)
+      - name: Controlla le piattaforme del manifest
+        run: |
+          set -eu
+          ref="${{ steps.vars.outputs.image }}:${{ steps.vars.outputs.tag }}"
+          docker buildx imagetools inspect "$ref"
+          platforms="$(docker buildx imagetools inspect "$ref" --format '{{range .Manifest.Manifests}}{{.Platform.OS}}/{{.Platform.Architecture}} {{end}}' | tr ' ' '\n' | grep -v '^$' | grep -v unknown | sort | tr '\n' ' ')"
+          echo "piattaforme: $platforms"
+          [ "$platforms" = "linux/amd64 linux/arm64 " ]

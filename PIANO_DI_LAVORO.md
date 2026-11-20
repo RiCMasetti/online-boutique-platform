@@ -107,12 +107,17 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 **Done quando:** Prometheus mostra la metrica del frontend con traffico del loadgenerator.
 
 ### Fase 6 — CI GitHub Actions (M) — Automazione 10%
-- [ ] Lint: `hadolint` sui Dockerfile modificati, `kubeconform` e `kustomize build` su dev e prod.
-- [ ] Test: `go test` del frontend (e dei servizi toccati).
+- [x] Lint: `hadolint` sui Dockerfile modificati, `kubeconform` e `kustomize build` su dev e prod.
+  - _Scritto e verificato in locale (2026-11-20); non ancora eseguito su GitHub. Vedi `docs/ci.md`._
+- [x] Test: `go test` del frontend (e dei servizi toccati).
+  - _Come sopra. Corretto un `status.Errorf` in checkoutservice che faceva fallire `go vet`._
 - [ ] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
+  - _Workflow scritti (runner nativi `ubuntu-24.04-arm`, fork pubblico); da eseguire. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
 - [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
 - [ ] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
+  - _Scritto: commit automatico in `deploy/components/dev-images`; da provare._
 - [ ] Scansione immagine (Trivy) come plus, non bloccante.
+  - _Scritta (job `scan`); da provare._
 
 **Done quando:** una PR fa girare i controlli; il merge produce un'immagine e un rollout in `dev`.
 

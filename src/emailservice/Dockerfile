@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Define a default value so it's not empty if the builder fails to provide it
-ARG BUILDPLATFORM=linux/amd64
+# Modifica rispetto a upstream (fase 6, ADR 0002): rimossi i default `BUILDPLATFORM=linux/amd64`,
+# `TARGETOS=linux` e `TARGETARCH=amd64`. Con buildx questi valori arrivano dalla piattaforma
+# di build e di destinazione; i default li sovrascrivevano e producevano binari amd64.
+# Serve BuildKit (`docker buildx build`).
 
 FROM --platform=$BUILDPLATFORM python:3.14.7-alpine@sha256:05b2b8b732ecd268fee8727a369f936f022d1321b59befd13c30ede22769dcdc AS base
 
