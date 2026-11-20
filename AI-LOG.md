@@ -90,6 +90,16 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-09 | 3 | implementazione | Claude Code | Fase 3: base e overlay `dev`/`prod`, hardening, NetworkPolicy, Secret Redis con SOPS+age, `apply-local.sh` e `netpol-test.sh`, `docs/security.md` | mod. | Eseguito su k3d: dev (12 pod) e prod (13 pod) attivi, smoke test superato in entrambi, `kubeconform` valido (Secret cifrato escluso). Dettagli e correzioni sotto |
 | AI-10 | 4 | implementazione | Claude Code | Fase 4: `flux bootstrap github`, Kustomization per infrastruttura, dev e prod con SOPS, `scripts/flux-bootstrap.sh`, `docs/gitops.md`, ADR 0003 | mod. | Eseguito su k3d: Flux sano, dev e prod gestiti da Flux, decifratura SOPS verificata, commit su `main` → dev aggiornato senza `kubectl apply`, rollback con `git revert`. Dettagli sotto |
 | AI-11 | 5 | implementazione | Claude Code | Fase 5 (solo frontend): metriche Prometheus `/metrics`, Dockerfile, build locale arm64/amd64, `docs/observability.md` | mod. | Test Go e `docker run` con le restrizioni del pod; scoperto e corretto un bug di build multi-arch ereditato da upstream. Poi provato in k3d dopo il push su `main`: serie con il traffico del loadgenerator. Dettagli sotto |
+| AI-12 | 5 | implementazione | Claude Code | Fase 5: sidecar `redis_exporter` in `redis-cart`, porta `metrics` sul Service | acc. | Provato in locale (password giusta/sbagliata), dry-run lato server, poi nel cluster dopo il push: `redis_up 1`, smoke test superato. Dettagli sotto |
+
+**AI-12, esito (2026-11-20, fase 5):**
+
+- *Eseguito:* sidecar `oliver006/redis_exporter:v1.97.0` (digest dell'indice multi-arch) nel Deployment `redis-cart` e porta `metrics` (9121) sul Service, in `deploy/base/kustomization.yaml` (vale per dev e prod; prod solo con la PR `main → prod`).
+- *Verificato prima del push:* exporter provato in locale contro un Redis con password: giusta → `redis_up 1`; sbagliata → `redis_up 0` con `WRONGPASS`, e `/health` risponde 200 in entrambi i casi (scelta delle probe); `kustomize build` e `kubeconform` validi; dry-run lato server accettato con Pod Security `restricted`.
+- *Verificato nel cluster (commit `58d2d340`):* pod `2/2`, nessun riavvio, `redis_up 1` e metriche dalla porta del Service, smoke test con checkout intero superato.
+- *Scelte:* sidecar e non deployment separato (nessuna regola nuova per la NetworkPolicy di Redis, stesso Secret, stesso ciclo di vita); password da variabile d'ambiente e non da argomento.
+- *Limiti dichiarati:* guasto `redis_up 0` non provato nel cluster; Prometheus non raccoglie ancora (fase 7, servirà una regola di ingress per `monitoring` sulla 9121); il riavvio ha azzerato i carrelli in dev; blackbox exporter (opzionale) non fatto; Redis senza `maxmemory`.
+- *Da fare da me:* leggere il blocco del sidecar in `deploy/base/kustomization.yaml`.
 
 **AI-11, esito (2026-11-20, fase 5 parziale):**
 

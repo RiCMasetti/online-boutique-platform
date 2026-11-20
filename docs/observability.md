@@ -80,7 +80,9 @@ Scelte:
 - **Segnale per l'alert (fase 7):** con password sbagliata (o Redis irraggiungibile) l'exporter risponde ma con `redis_up 0` e `redis_exporter_last_scrape_error{err="WRONGPASS ..."} 1`. Le metriche utili sono `redis_up`, `redis_connected_clients`, `redis_memory_used_bytes`, `redis_commands_processed_total`, `redis_db_keys`.
 - **Limite:** Redis non ha `maxmemory` e il limite del container è 256Mi: con `noeviction` (rilevato dall'exporter) un riempimento si traduce in OOMKilled, non in errori di scrittura. Utile per lo scenario di failure della fase 8.
 
-Provato in locale (container Docker con `redis:alpine --requirepass`): password giusta → `redis_up 1` e metriche; password sbagliata → `redis_up 0` con errore esplicito. Il `kustomize build` di dev e prod contiene sidecar e porta del Service, `kubeconform` valido, e il dry-run lato server in k3d accetta Deployment e Service (Pod Security `restricted` inclusa). Vedi §3 per l'esito nel cluster.
+Provato in locale (container Docker con `redis:alpine --requirepass`): password giusta → `redis_up 1` e metriche; password sbagliata → `redis_up 0` con errore esplicito. Il `kustomize build` di dev e prod contiene sidecar e porta del Service, `kubeconform` valido, e il dry-run lato server in k3d accetta Deployment e Service (Pod Security `restricted` inclusa). 
+
+Provato nel cluster dopo il push (commit `58d2d340`, Flux ha applicato dev): pod `redis-cart` `2/2 Running`, 0 riavvii; `/metrics` letto dalla porta `metrics` del Service (via `port-forward`) con `redis_up 1`, `redis_exporter_last_scrape_error 0`, 3 client connessi, 5 chiavi in `db0`, circa 1,7 MB di memoria; lo smoke test (carrello e checkout intero) passa con il Redis riavviato, quindi il sidecar non disturba cartservice. Il riavvio del pod ha azzerato i carrelli esistenti (`emptyDir`), come previsto. **Non provato:** il caso di guasto nel cluster (`redis_up 0` visto solo in locale); la raccolta da parte di Prometheus (fase 7, e la NetworkPolicy di Redis dovrà ammettere il namespace `monitoring` sulla 9121); prod, che riceverà il sidecar solo con la PR `main → prod`.
 
 ## 6. Ancora da fare in fase 5
 
