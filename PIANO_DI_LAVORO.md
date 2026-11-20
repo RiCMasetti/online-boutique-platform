@@ -114,7 +114,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 - [x] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
   - _Runner arm64 nativi disponibili sul fork pubblico; build di 11 servizi × 2 architetture passate sulla PR (senza push); push da provare. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
 - [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
-  - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: PR di promozione preparata (immagini GHCR, workaround tolto), da unire e verificare (`docs/ci.md` §5)._
+  - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: promosso il 2026-11-20 (`prod@7a723188`), 0 restart, smoke test ok (`docs/ci.md` §5)._
 - [x] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
   - _Commit automatico in `deploy/components/dev-images`: provato, Flux ha fatto il rollout in dev (12/12 pronti, smoke test ok)._
 - [x] Scansione immagine (Trivy) come plus, non bloccante.
