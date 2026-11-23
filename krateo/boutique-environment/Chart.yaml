@@ -1,0 +1,9 @@
+# CHART WRAPPER CONCETTUALE (fase 9). Non installato in nessun cluster Krateo.
+# Un chart "wrapper" non contiene l'applicazione: contiene solo gli oggetti che descrivono
+# un nuovo ambiente (qui, oggetti Flux). Il chart di Online Boutique resta Kustomize.
+apiVersion: v2
+name: boutique-environment
+description: Golden path "nuovo ambiente Boutique" - genera la sorgente Git e la Kustomization Flux di un ambiente
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

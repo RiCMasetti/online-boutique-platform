@@ -1,0 +1,16 @@
+# Sorgente Git dell'ambiente. Sta in flux-system perché il Secret della deploy key e
+# la chiave `sops-age` vivono lì (Flux risolve i secretRef nel namespace dell'oggetto).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: boutique-{{ .Values.name }}
+  namespace: flux-system
+  labels:
+    {{- include "boutique-environment.labels" . | nindent 4 }}
+spec:
+  interval: 1m
+  url: {{ .Values.repository.url | quote }}
+  ref:
+    branch: {{ .Values.repository.branch | quote }}
+  secretRef:
+    name: {{ .Values.repository.secretName | quote }}

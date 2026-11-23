@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "BoutiqueEnvironment",
+  "description": "Un ambiente Online Boutique gestito da Flux.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "environment", "owner", "tier"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome dell'ambiente (nome DNS-1123, massimo 30 caratteri).",
+      "pattern": "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 30
+    },
+    "namespace": {
+      "type": "string",
+      "description": "Namespace dell'ambiente. Vuoto = boutique-<name>.",
+      "pattern": "^$|^[a-z]([-a-z0-9]*[a-z0-9])?$",
+      "maxLength": 63
+    },
+    "environment": {
+      "type": "string",
+      "description": "Overlay da applicare: dev (con loadgenerator) o prod (senza).",
+      "enum": ["dev", "prod"]
+    },
+    "owner": {
+      "type": "string",
+      "description": "Team responsabile dell'ambiente (valore di etichetta Kubernetes).",
+      "pattern": "^[A-Za-z0-9]([-A-Za-z0-9_.]*[A-Za-z0-9])?$",
+      "maxLength": 63
+    },
+    "tier": {
+      "type": "string",
+      "description": "Classe di servizio: decide le repliche dei servizi sul percorso utente.",
+      "enum": ["best-effort", "standard", "critical"]
+    },
+    "ingressHost": {
+      "type": "string",
+      "description": "Host dell'Ingress. Vuoto = boutique-<name>.localtest.me.",
+      "pattern": "^$|^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$",
+      "maxLength": 253
+    },
+    "frontend": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "limits": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cpu": {
+              "type": "string",
+              "description": "Limite di CPU del frontend (quantity Kubernetes, es. 200m).",
+              "pattern": "^[0-9]+(\\.[0-9]+)?m?$"
+            },
+            "memory": {
+              "type": "string",
+              "description": "Limite di memoria del frontend (quantity Kubernetes, es. 128Mi).",
+              "pattern": "^[0-9]+(Ki|Mi|Gi)$"
+            }
+          }
+        }
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "URL Git dell'applicazione (ssh:// o https://).",
+          "pattern": "^(ssh|https)://"
+        },
+        "branch": {
+          "type": "string",
+          "description": "Branch seguito da Flux.",
+          "minLength": 1
+        },
+        "secretName": {
+          "type": "string",
+          "description": "Secret con la deploy key, in flux-system."
+        }
+      }
+    }
+  }
+}

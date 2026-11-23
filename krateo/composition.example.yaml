@@ -1,0 +1,20 @@
+# YAML CONCETTUALE (fase 9). Mai applicato.
+# apiVersion: la pagina "Create a Composition" dice che segue la versione del chart
+# (composition.krateo.io/v0-0-1 per il chart 0.0.1), quindi 0.1.0 -> v0-1-0.
+# kind: INFERITO per analogia con l'esempio della documentazione (chart github-scaffolding-lifecycle
+# -> kind GithubScaffoldingLifecycle). La regola di derivazione non è scritta nelle pagine lette.
+apiVersion: composition.krateo.io/v0-1-0
+kind: BoutiqueEnvironment
+metadata:
+  name: demo-staging                 # massimo 44 caratteri (release Helm = nome + "-" + 8 caratteri UID)
+  namespace: boutique-system
+spec:
+  name: staging
+  environment: prod
+  owner: team-checkout
+  tier: critical
+  ingressHost: boutique-staging.localtest.me
+  frontend:
+    limits:
+      cpu: 300m
+      memory: 256Mi

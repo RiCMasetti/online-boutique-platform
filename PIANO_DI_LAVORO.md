@@ -145,14 +145,16 @@ Fase più pesante: dedicale tempo vero.
 **Done quando:** puoi rompere e riparare ogni scenario in meno di 5 minuti, spiegando la diagnosi.
 
 ### Fase 9 — Valutazione Krateo (M) — Krateo 5%
-- [ ] Studia la documentazione corrente di Krateo (non fidarti della memoria o dell'AI: verifica).
-- [ ] Individua il golden path: "nuovo ambiente Boutique" come template.
-- [ ] Parametri da esporre: nome servizio, namespace, ambiente, risorse, ingress host, repository, owner, tier.
-- [ ] Chiarisci cosa Krateo orchestra (risorse K8s, pipeline, DB) e cosa resta a Flux.
-- [ ] Benefici, prerequisiti, limiti, rischi; distingui **PoC / blueprint / adozione reale**.
-- [ ] Artefatto: diagramma di integrazione + YAML concettuale (chart wrapper per la composition). PoC solo se avanza tempo.
-- [ ] Il chart wrapper deve avere un `values.schema.json` nella root: la doc di Krateo lo indica come prerequisito di una `CompositionDefinition` (fonte in AI-LOG, AI-01). Lo schema coincide con i parametri esposti nel golden path. Rileggi la pagina direttamente, il controllo fatto finora è solo un riassunto.
-- [ ] Raccomandazione argomentata: se, quando e come adottarlo.
+- [x] Studia la documentazione corrente di Krateo (non fidarti della memoria o dell'AI: verifica). _Lette per intero 19 pagine di docs.krateo.io 3.0.0 (elenco in `docs/krateo-evaluation.md` §2); non lette: FinOps, Kserve, autenticazione, widget, migrazioni, `krateoctl`. Incoerenze della doc segnalate (rc1, 1.30 vs 1.31, solo Argo CD negli esempi)._
+- [x] Individua il golden path: "nuovo ambiente Boutique" come template.
+- [x] Parametri da esporre: nome servizio, namespace, ambiente, risorse, ingress host, repository, owner, tier.
+- [x] Chiarisci cosa Krateo orchestra (risorse K8s, pipeline, DB) e cosa resta a Flux.
+- [x] Benefici, prerequisiti, limiti, rischi; distingui **PoC / blueprint / adozione reale**.
+- [x] Artefatto: diagramma di integrazione + YAML concettuale (chart wrapper per la composition). PoC solo se avanza tempo. _Blueprint in `krateo/` e diagramma in `docs/krateo-evaluation.md` §3.3; controlli statici passati (lint, schema, kubeconform, patch su overlay prod). **PoC non fatto** (il cluster ha 6 CPU/9,7 GiB, la doc chiede 12 vCPU/16 GiB) e **overlay parametrico non creato**._
+- [x] Il chart wrapper deve avere un `values.schema.json` nella root: la doc di Krateo lo indica come prerequisito di una `CompositionDefinition` (fonte in AI-LOG, AI-01). Lo schema coincide con i parametri esposti nel golden path. Rileggi la pagina direttamente, il controllo fatto finora è solo un riassunto. _Riletta il 2026-11-23 (HTML scaricato e convertito, testo integrale): conferma `values.schema.json` come prerequisito; lo schema genera la CRD._
+- [x] Raccomandazione argomentata: se, quando e come adottarlo. _Non adottare ora; ADR 0005. Poggia su un'assenza di prove (compatibilità Krateo + Flux non provata)._
+
+**Done quando (dedotto dagli item):** raccomandazione scritta con distinzione PoC/blueprint/adozione. Raggiunto come blueprint; il PoC non c'è.
 
 ### Fase 10 — Documentazione finale e sezione AI (M)
 - [ ] README completo (prerequisiti, build, deploy, test, demo) **provato da zero su un cluster pulito**.
