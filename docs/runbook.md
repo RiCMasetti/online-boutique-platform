@@ -6,6 +6,7 @@ Tutto quello che è scritto come «misurato» è stato eseguito il 23 novembre 2
 
 ```bash
 scripts/smoke-test.sh                       # home, prodotto, carrello, checkout: 7 controlli
+scripts/ops.sh status                       # nodi, pod non Ready, restart passati, riepilogo Flux (§6)
 kubectl -n boutique-dev get pods            # tutti 1/1 (redis-cart 2/2) e Running?
 flux get kustomization boutique-dev         # READY True, revisione attesa, SUSPENDED False
 kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090:9090   # poi /alerts
@@ -39,6 +40,8 @@ kubectl -n boutique-dev get events --sort-by=.lastTimestamp | tail -20
 kubectl -n boutique-dev rollout status deploy/<nome>
 kubectl -n boutique-dev rollout history deploy/<nome>
 ```
+
+`scripts/ops.sh` raccoglie gli stessi controlli in un comando solo (`why <servizio>`, `prev <servizio>`, `events --warnings`): vedi §6.
 
 ## 3. Scenari provati
 
@@ -129,3 +132,60 @@ Procedura consigliata:
 - Più di un servizio coinvolto, o Redis non risponde (il carrello si perde: `redis-cart` non ha persistenza, vedi `docs/security.md`).
 - Il nodo è saturo (`kubectl top nodes` oltre l'80% di CPU): prima di cercare un guasto applicativo si guarda chi consuma (`kubectl top pod -A --containers`). È già successo con Grafana (vedi §3.6).
 - Prod: ogni intervento passa da Git e da una PR, mai da `kubectl`.
+
+## 6. Strumenti: `scripts/ops.sh`
+
+Un solo script con sottocomandi per guardare cluster, pod, Flux e manifest. Usa solo `kubectl`, `jq`, `kustomize` e `kubeconform` (non servono `stern`, `k9s` né il CLI `flux`), sul contesto `k3d-boutique` (variabile `CONTEXT`). Il namespace predefinito è `boutique-dev`; si cambia con `-n prod`, `-n monitoring` o qualunque altro. `scripts/ops.sh help` stampa l'elenco.
+
+### 6.1 Controllo di cluster e pod (sola lettura)
+
+| Comando | Cosa mostra |
+|---|---|
+| `status` | Nodi, pod del namespace, pod non Ready, numero di pod con restart passati, riepilogo Flux. |
+| `top [cpu\|mem]` | CPU e memoria di nodi e pod, ordinate, con uso rispetto a requests e limits. La colonna NOTA segnala `mem>=80%` o `cpu>=80%`. È una fotografia di metrics-server, non una storia (per quella c'è Prometheus). |
+| `logs <svc\|pod> [-f] [--since 10m] [--tail N] [-c container]` | Log di tutti i pod del servizio, con prefisso `pod/container`. Il servizio si cerca per label `app=`, poi `app.kubernetes.io/name=`: va bene anche `grafana` in `-n monitoring`. |
+| `prev <svc\|pod> [--tail N]` | `logs --previous` per ogni container con restart, con motivo, exit code e ora dell'ultimo stop. Se non ci sono restart lo dice. |
+| `why <svc\|pod>` | Fase, nodo, condizioni non vere, per ogni container: stato, ultimo stop (`OOMKilled`, exit code), requests e limits, probe con timeout, più gli ultimi eventi del pod. |
+| `restarts` | Tutti i container con restart > 0 e il motivo dell'ultimo. |
+| `events [--warnings] [--tail N]` | Eventi del namespace in ordine di tempo. |
+
+Esempio reale (23 novembre 2026, dopo un riavvio del cluster): `restarts` mostra tutti i pod di dev con un restart alle 14:24:26, exit 255, motivo `Unknown`; `why emailservice` aggiunge `SandboxChanged` e probe di readiness e liveness andate in timeout da 1 s (4 restart in tutto, gli ultimi a exit 137). Quindi: nodo o Docker riavviato e probe da 1 s troppo strette sul nodo occupato, non un difetto delle app.
+
+### 6.2 Flux
+
+| Comando | Cosa fa |
+|---|---|
+| `flux` | Sorgenti, Kustomization e HelmRelease con Ready, sospesa, revisione applicata. La colonna NOTA segnala una Kustomization **sospesa** o **in ritardo** rispetto alla sorgente. |
+| `flux events` | Ultimi 20 eventi degli oggetti Flux. |
+| `flux logs [controller] [--tail N] [--errors] [-f]` | Log di un controller (predefinito `kustomize-controller`; accetta anche `source`, `helm`, `notification`). `--errors` tiene solo i livelli `error` e `warn`. |
+| `flux reconcile [kustomization] [--with-source]` | **Modifica il cluster**: chiede la riconciliazione e attende che Flux la confermi (fino a 120 s). Senza nome usa quella del namespace (`-n`). `--with-source` rilegge prima Git. |
+
+### 6.3 Manifest: `build`
+
+`scripts/ops.sh build [dev|prod|infra|stack|config|all|<cartella>] [--out DIR]` esegue `kustomize build` e poi `kubeconform -strict -skip Secret`, con gli stessi flag della CI (`.github/workflows/checks.yaml`) e schemi Kubernetes 1.33.0 (variabile `KUBE_VERSION`). Senza argomento controlla i cinque percorsi che Flux applica. Per `infra`, `stack`, `config` e per una cartella qualsiasi si aggiunge `-ignore-missing-schemas`, perché HelmRelease, ServiceMonitor e PrometheusRule sono CRD senza schema nel catalogo di kubeconform: di quelli si verifica solo che il build funzioni. Esce con codice 1 se un build o una validazione falliscono; `--out` salva i YAML generati.
+
+Il Secret SOPS viene saltato (la chiave `sops` alla radice non è ammessa dallo schema) e **non viene decifrato**: `build` non prova che Flux riesca a decifrarlo. Un component (per esempio `deploy/components/dev-images`) non produce risorse da solo e viene segnalato come errore.
+
+### 6.4 Grafana
+
+`grafana` stampa URL (`http://grafana.localtest.me:8080`), utente e password, leggendoli dal Secret `grafana-admin` nel cluster, e controlla `/api/health`. `--copy` copia la password negli appunti (macOS, `pbcopy`) senza mostrarla; `--raw` stampa solo la password; `--open` apre il browser. La password in chiaro compare nel terminale nel caso base.
+
+### 6.5 Traffico del loadgenerator (solo dev)
+
+| Comando | Effetto |
+|---|---|
+| `load status` | Repliche, `USERS`, `RATE`, stato di Flux, ultima riga di statistiche Locust. |
+| `load up [N]` / `load down [N]` | Moltiplica o divide `USERS` e `RATE` per N (predefinito 2, minimo 1). |
+| `load set <utenti> [rate]` | Imposta `USERS` e, se indicato, `RATE` (utenti al secondo di avvio). |
+| `load stop` / `load start` | 0 o 1 repliche. |
+| `load reset` | Riattiva Flux, riconcilia da Git e riporta il Deployment ai valori di Git (10 utenti, 1 al secondo). |
+
+Ogni modifica ricrea il pod. Il traffico non è lineare con `USERS`: con 40 utenti e `RATE=4` si sono misurate circa 11 richieste al secondo contro circa 2 con i valori di Git. `set` rifiuta più di 200 utenti (nodo piccolo) senza `--force` (o `LOAD_MAX_USERS`).
+
+**Flux annulla le modifiche manuali.** Senza `--hold` il Deployment torna ai valori di Git entro 10 minuti (provato: `flux reconcile` ha riportato 30 utenti a 10). Con `--hold` lo script sospende la Kustomization `boutique-dev` e la modifica resta, ma finché è sospesa dev non segue più Git. Come in §4, **non dimenticare di riprendere Flux**: `load reset` lo fa; `load status`, `status` e `flux` mostrano se è sospesa. `scripts/break-it.sh` sospende la stessa Kustomization e il suo `restore` la riprende: non usare i due insieme.
+
+### 6.6 Stato della prova
+
+Provato su dev (23 novembre 2026, k3d, un nodo): `status`, `top`, `logs`, `prev` e `why` su servizi con restart reali, `restarts`, `events`, `flux` (stato, eventi, log, `reconcile --with-source`), `build` su dev, prod e osservabilità (esito positivo) e su tre casi volutamente rotti (riferimento a un file mancante, campo inventato nel Deployment, component senza risorse: tutti con codice di uscita 1), `grafana` e `grafana --copy` (con un `pbcopy` finto, per non toccare gli appunti), `-n monitoring` (`status`, `top`, `logs grafana`, `prev grafana`), tutti i sottocomandi di `load`, compresi il tetto di utenti, `--hold` e `reset`.
+
+**Non provato**: `grafana --open`; `logs -f` e `flux logs -f`; `-n prod` oltre al rifiuto di `load` (in prod non c'è il loadgenerator); `why`, `restarts` e `events` in `monitoring` (lì provati `status`, `top`, `logs` e `prev`); l'effetto di `load` con più di 40 utenti, quindi il tetto di 200 non è tarato su una misura.
