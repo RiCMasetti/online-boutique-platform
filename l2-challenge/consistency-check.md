@@ -20,10 +20,10 @@ Obiettivo del piano: **nessun comando nei documenti che non sia stato eseguito.*
 | `kubectl … rollout history deploy/frontend` | runbook | **oggi** |
 | `scripts/break-it.sh status` | README, runbook | **oggi**; gli scenari e `restore`: **fase 8** (2026-11-23, tutti e cinque) |
 | `kustomize build` + `kubeconform -strict -skip Secret …` (dev, prod) | README | **oggi**: 0 invalidi (50 e 47 risorse valide); anche **solo CI** |
-| `scripts/cluster-up.sh` | README, gitops | **fase 2 e 3**, da cluster cancellato (2026-11-19). Oggi **non rieseguito**; lo script non è cambiato dal 2026-11-19 |
+| `scripts/cluster-up.sh` | README, gitops | **fase 2 e 3**, da cluster cancellato (2026-11-19); **rieseguito da cluster cancellato il 2026-11-23** (nodo e Traefik pronti) |
 | `scripts/apply-local.sh dev|prod` | README, security | **fase 3**, da cluster cancellato (2026-11-19, mia conferma in `AI-LOG.md`) |
 | `scripts/netpol-test.sh` | README, security | **fase 3** (dev e prod, con controlli negativi); non rieseguito oggi; sintassi `bash -n` ok |
-| `scripts/flux-bootstrap.sh` | README, gitops | **fase 4**: eseguito e rieseguito (idempotente) su un cluster che esisteva già. **Da cluster cancellato: no** |
+| `scripts/flux-bootstrap.sh` | README, gitops | **fase 4**: eseguito e rieseguito (idempotente) su un cluster che esisteva già; **da cluster cancellato: sì, 2026-11-23** (Secret `sops-age` creato, deploy key sostituita, nessun commit generato) |
 | `gh pr create --base prod --head main`, `gh pr merge` | gitops | **fase 4/6** (PR #1, #7) |
 | `git revert` e push (dev) | gitops, runbook | **fase 4**: provato con un cambio di repliche. Un commit sbagliato su prod: **no** |
 | `flux suspend/resume kustomization` | gitops, runbook | **fase 8**, dentro `break-it.sh` |
@@ -79,4 +79,4 @@ Non descrivono questa piattaforma: sono dell'applicazione originale (primi commi
 
 - **Il cluster era in transizione durante il controllo.** Dopo il merge delle PR #11 e #12, `boutique-dev` e `observability-config` sono passate per alcuni minuti in `READY False` («dependency … is not up to date»), poi sono rientrate: normale riconciliazione di Flux a un nuovo commit su `main`, non un guasto. Lo dico perché i numeri di revisione citati nei documenti (`main@649735c2`, `prod@7a723188`) sono una fotografia: oggi `main` è a `6b425017`.
 - **Prod resta a `prod@7a723188`**, indietro rispetto a `main`: non ho aperto la PR di promozione.
-- **Il controllo non sostituisce la prova da zero.** Restano due prove richieste dal piano e non fatte: l'installazione completa con Flux su un cluster cancellato, e il rollback di un commit sbagliato.
+- **La prova da zero con Flux è stata fatta il 2026-11-23, dopo questo controllo** (cluster cancellato e ricreato con `cluster-up.sh` + `flux-bootstrap.sh`; 6 Kustomization `Ready` in circa 3 minuti, 30 pod `Running` con 0 riavvii, smoke test 7/7 in dev e prod). Resta non fatto il rollback di un commit sbagliato. Restano anche non provati: il percorso di un altro utente, `netpol-test.sh` sul cluster nuovo e il login a Grafana (verificato solo `/api/health`).
