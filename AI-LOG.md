@@ -95,6 +95,26 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-14 | 6 | implementazione | Claude Code | Fase 6: workflow GitHub Actions (controlli, build multi-arch su runner nativi, push GHCR, tag in dev), Dockerfile di tutti gli 11 servizi, `docs/ci.md` | mod. | Controlli eseguiti in locale; sulla PR #2 passano `checks` e le 22 build senza push. Push GHCR, manifest e rollout **non ancora eseguiti**. Dettagli sotto |
 | AI-15 | 6 | operations | Claude Code | Fase 6: promozione di prod (immagini GHCR, via `arm64-workaround`) e PR `main → prod` | mod. | PR #6 e #7 unite da me (autore); Flux ha applicato `prod@7a723188`; 0 restart, smoke test ok. Eventi `Unhealthy` negli avvii. Dettagli sotto |
 | AI-16 | 7 | implementazione | Claude Code | Fase 7: kube-prometheus-stack via HelmRelease, ServiceMonitor, alert, dashboard, NetworkPolicy per Prometheus, ADR 0004 | mod. | Scritto e validato in modo statico (`helm template`, `kustomize build`, `kubeconform`); **non installato nel cluster**, query e alert non provati. Dettagli sotto |
+| AI-17 | 8 | operations | Claude Code | Troubleshooting di Grafana in down (incidente reale, 23 nov): l'utente ipotizza la memoria | mod. | Ipotesi dell'utente **non confermata**: era la CPU (4,4 core, exit 137 dalla liveness). Fix gia' in PR #10, verificato 5 minuti |
+| AI-18 | 8 | operations | Claude Code | Fase 8: `scripts/break-it.sh` (5 guasti), `docs/runbook.md` | mod. | Tutti i guasti eseguiti e ripristinati in dev con tempi misurati. Un difetto del mio `restore` trovato provando il guasto; rollback GitOps non provato. Dettagli sotto |
+
+**AI-18, fase 8: guasti, runbook (2026-11-23):**
+
+- *Eseguito:* `scripts/break-it.sh` con `image-tag`, `bad-addr`, `missing-addr`, `low-memory`, `frontend-down`, `restore`, `status`. Concordato con l'utente: guasti con `kubectl` e `flux suspend`, non da Git. Ogni scenario lanciato, diagnosticato con `describe`/`logs --previous`/eventi e ripristinato; `docs/runbook.md` ne riporta sintomi, diagnosi e tempi misurati.
+- *Errori trovati provando, non rileggendo:* (1) `status` segnava "non sano" tutti i pod: avevo usato un backreference in `awk`, che non lo supporta; (2) il primo `low-memory` era rifiutato dall'API (richiesta 64Mi > limite 16Mi) e lasciava Flux sospesa: aggiunti `--requests` e un `trap` che la riprende; (3) **`restore` dichiarava "completato" con il frontend ancora a 0 repliche** (shop 503): Git non dichiara `replicas` per il frontend e Flux non corregge i campi che non possiede. L'ho visto dallo smoke test, non dallo script: ora `restore` reimposta le repliche e fallisce se un Deployment non e' pronto. (4) un mio `sed -i` con sintassi GNU e' fallito su macOS (BSD) senza fermare la sequenza di comandi: me ne sono accorto solo perche' il messaggio nel codice era rimasto vecchio; ho usato Python.
+- *Ipotesi del piano confermate dal vivo:* un valore sbagliato non causa crash loop (solo errori 500 con pod `Ready`); un valore assente causa `panic` e `CrashLoopBackOff`.
+- *Osservazione non attesa:* con un rolling update a una replica, tag inesistente, variabile mancante e limite troppo basso **non interrompono il servizio**: il vecchio pod resta. Il segnale e' il rollout bloccato, non un alert di indisponibilita'.
+- *Alert esercitati:* `FrontendHigh5xxRate`, `PodCrashLooping`, `FrontendUnavailable` scattati con i tempi del runbook. Prima delle prove, gli ultimi due erano non esercitati.
+- *Limiti:* i guasti li ho scelti io e conoscevo la risposta, quindi non misurano la qualita' della diagnosi dell'AI; il rollback con `git revert` e `rollout undo` contro Flux **non e' provato**; alert non osservati per `image-tag` e `low-memory`; `CPUThrottlingHigh` su `redis-exporter` in dev notato e non indagato.
+
+**AI-17, caso di troubleshooting: Grafana in down (2026-11-23):**
+
+- *Prompt (dell'utente, parola per parola):* «Grafana è down, credo per un problema di memoria, non ho indagato.»
+- *Cosa ho fatto prima di rispondere:* `kubectl get pods` (121 riavvii), `describe pod`, `kubectl top`, eventi. Nessun secret nell'output.
+- *Ipotesi dell'utente: sbagliata.* Memoria 281Mi su 384Mi di limite; `Exit Code 137` ma `Reason: Error`, non `OOMKilled`; CPU a 4,4 core, nodo all'86%, probe in timeout anche su altri pod. Causa: la liveness uccideva Grafana saturo di CPU.
+- *Cosa era sbagliato o incompleto nel lavoro dell'AI:* (1) la fase 7 documentava Grafana come "calmo dopo il riavvio" in base a pochi minuti; il problema e' tornato e il pod e' arrivato a 121 riavvii in tre giorni; (2) avevo scritto la correzione (PR #10) con la causa come *ipotesi non provata*, giustamente, ma senza averla verificata sul cluster fino a oggi; (3) 5 minuti di verifica dopo il merge non coprono tre giorni.
+- *Esito:* PR #10 unita e applicata da Flux; Grafana a 56-250 mCPU, 0 riavvii in circa 10 minuti. Causa (sidecar delle dashboard) ancora non provata.
+- *Valore e limite:* l'AI ha trovato la discrepanza leggendo lo stato del container; l'utente aveva intuito la direzione ("risorse") ma non la risorsa. Senza il controllo di `Reason` e della CPU la via piu' ovvia sarebbe stata alzare il limite di memoria, che non avrebbe risolto il problema (inferenza, non provata).
 
 **AI-16, stack di osservabilità (2026-11-20, solo lavoro statico):**
 
