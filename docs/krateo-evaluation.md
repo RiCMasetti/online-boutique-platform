@@ -30,13 +30,14 @@ Letto il 2026-11-23, scaricando le pagine HTML e convertendole in testo (lettura
 | `how-to-guides/install-krateo/installing-krateo`, `/` (home) | Installazione con `krateoctl`; tre Secret obbligatori prima (`jwt-sign-key`, `krateo-db`, `krateo-db-user`); PostgreSQL via CloudNativePG; requisiti: Kubernetes >= 1.31, **12 vCPU e 16 GiB**, StorageClass |
 | `release-notes/release-note-3.0.0` | Rilascio 3.0.0 con modifiche incompatibili (etcd sostituito da PostgreSQL, nuovo installer `krateoctl`); da 2.7.x serve una migrazione guidata |
 | `key-concepts/kco/troubleshooting` | Problemi tipici: `CompositionDefinition` che non diventa Ready, certificati del webhook, versione "vacuum" persa |
-| `3.0.0-rc1/.../kcp/frontend` (widget), `kog/oasgen-provider` | Solo l'idea: il portale è fatto di widget che sono CRD; l'OASGen Provider genera CRD da specifiche OpenAPI. **Non letti a fondo** |
+| `key-concepts/kog/oasgen-provider`, `provider-reference/github-provider-kog` | Lette il 2026-11-23, usate in §3.4. L'OASGen Provider genera CRD e un controllore (Rest Dynamic Controller) da una specifica OpenAPI 3.0/3.1; il provider GitHub ne è un'applicazione |
+| `key-concepts/kcp/frontend/overview` (widget) | Letta il 2026-11-23, usata in §3.4. Il portale è fatto di widget, ciascuno una CRD con schema JSON; i dati arrivano da `RESTAction` |
 
 In una frase: Krateo trasforma un **chart Helm con `values.schema.json`** in una **API Kubernetes versionata** (la CRD generata dallo schema) e mantiene ogni istanza di quell'API come release Helm, con permessi minimi e un portale sopra.
 
 ### Limiti di questa lettura
 
-- **Non letto:** componenti FinOps, Kserve, autenticazione, il dettaglio dei widget e delle `RESTAction`, le guide di migrazione, la documentazione di `krateoctl`. Un blueprint del portale vero e proprio (la parte "form") non è disegnato qui.
+- **Non letto:** componenti FinOps, Kserve, autenticazione del portale, la pagina delle `RESTAction`, l'elenco completo dei widget, la guida d'uso e gli esempi reali dell'OASGen Provider, gli altri provider (solo GitHub letto), le guide di migrazione, la documentazione di `krateoctl`. Un blueprint del portale vero e proprio (la parte "form") non è disegnato qui.
 - **Incoerenze nella doc, segnalate per non dare per certo ciò che la pagina non dice:**
   - il banner dice 3.0.0 ma la pagina Quickstart installa "3.0.0-rc1";
   - i requisiti dicono Kubernetes >= 1.31, la pagina di installazione e del Core Provider >= 1.30. Il nostro k3s è 1.36, quindi non cambia l'esito;
@@ -98,6 +99,24 @@ flowchart LR
 ```
 
 *Cosa è provato in questo diagramma:* i riquadri e le frecce di Flux, Git e CI esistono e sono quelli del repo (`docs/gitops.md`, `docs/ci.md`). *Cosa è una proposta non provata:* tutto ciò che sta nel riquadro Krateo e le due frecce che escono da `CDC` e dal registro. La forma degli oggetti Krateo viene dalla doc (§2).
+
+### 3.4 Pipeline, database, servizi esterni, risorse cloud, catalogo
+
+La traccia chiede come Krateo potrebbe "orchestrare o rappresentare" anche questi componenti. Dalle pagine lette (§2) risultano **due meccanismi**, e va tenuto distinto ciò che la doc dice da ciò che deduco io.
+
+- **Composition (chart Helm).** Il chart può contenere qualsiasi risorsa Kubernetes, comprese le CRD di operatori terzi. È ciò che usa il blueprint di §3.2 per gli oggetti Flux.
+- **OASGen Provider.** Da una `RestDefinition` che punta a una specifica OpenAPI 3.0/3.1 genera una CRD e un controllore dedicato, che crea, legge, aggiorna e cancella la risorsa su un'API REST esterna. La fonte di verità è la risorsa nel cluster, non il sistema esterno. Limiti dichiarati dalla doc: autenticazione solo **Bearer** o **Basic**; non supportati `number`, `nullable`, `anyOf`/`oneOf`/`not`, `pattern`, `minimum`/`maximum` e simili; i nomi dei campi devono essere coerenti tra le azioni, altrimenti serve un servizio wrapper (plugin).
+
+| Componente | Come Krateo lo rappresenterebbe | Per la Boutique | Stato |
+|---|---|---|---|
+| **Pipeline CI** | `github-provider-kog` (costruito sull'OASGen) ha le risorse `Repo`, `Collaborator`, `TeamRepo`, `RunnerGroup` e `Workflow`. `Workflow` **lancia** un `workflow_dispatch` con degli input (solo creazione: niente lettura, update o cancellazione). Richiede un token Bearer in un Secret | Il form potrebbe creare il repository di un ambiente e avviare una pipeline. Oggi solo `release.yaml` ha `workflow_dispatch`: `build-images.yaml` andrebbe adattato. La CI resta GitHub Actions: Krateo la avvia, non la sostituisce | Descritto dalla doc, **non provato**; il provider si dichiara destinato a sostituire quello originale |
+| **Database** | Nessun provider per database nelle pagine lette. Per Composition: includere nel chart la CRD di un operatore (la doc stessa usa CloudNativePG per il PostgreSQL di Krateo) | **Non serve**: la Boutique ha solo Redis nel cluster, senza persistenza (`docs/security.md` §3) | Ipotesi mia; richiede l'operatore già installato |
+| **Servizio esterno con API REST** | `RestDefinition` su una sua specifica OpenAPI | Nessuno oggi | Vale solo se l'API rispetta i limiti sopra (autenticazione, tipi, coerenza dei nomi) |
+| **Risorse cloud** | Nessun provider cloud letto (della famiglia ho visto solo GitHub; Azure DevOps compare come riferimento CRD, non letto). Via OASGen solo se l'API ha autenticazione Bearer/Basic; la doc cita un wrapper per aggiungere la firma delle richieste (`request signing`), e deduco che servirebbe per schemi come AWS SigV4 (l'esempio è mio) | Nessuna: l'ambiente è un k3d locale | **Non verificato.** Idee come usare Crossplane o ACK dentro un chart sono mie, non nella doc |
+| **Catalogo** | Le pagine lette non descrivono un catalogo di template. Descrivono widget composabili: un `Table` alimentato da una `RESTAction` può elencare oggetti Kubernetes (l'esempio della doc elenca i namespace) | Un elenco degli ambienti Boutique (le `Composition`, con `owner` e `tier`) si potrebbe costruire così | Ipotesi mia; non so se il portale offra un catalogo già pronto |
+| **Governance** | Permessi minimi per definizione (Chart Inspector) e RBAC; l'OASGen genera anche RBAC per le sue risorse | Già in §6; l'etichetta `owner` è un'informazione, non una policy | Parziale |
+
+**Risposta breve:** secondo la doc Krateo può rappresentare come risorse Kubernetes qualsiasi cosa descritta da un chart o da un'API REST con autenticazione Bearer/Basic. Per la pipeline c'è un caso concreto (il provider GitHub). Per database e cloud è **possibile in principio**, ma nelle pagine lette non c'è un provider pronto e non l'ho provato. Per questo la valutazione non lo conta tra i benefici di questo progetto.
 
 ## 4. Artefatti e cosa è stato verificato
 
