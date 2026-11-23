@@ -6,7 +6,7 @@ Questo documento è la sintesi. Il materiale grezzo, con prompt, decisioni ed er
 
 ## In breve
 
-- **20 voci** nel diario (`AI-01`…`AI-20`), fasi 0-10. Per area: analisi 4, implementazione 6, operations 7, documentazione 2, governance 1. La suddivisione è l'etichetta data alla voce, non il tempo speso: la documentazione è stata scritta dentro quasi tutte le voci di implementazione e di operations, quindi quella riga sottostima il suo peso.
+- **21 voci** nel diario (`AI-01`…`AI-21`), fasi 0-10. Per area: analisi 4, implementazione 6, operations 8, documentazione 2, governance 1. La suddivisione è l'etichetta data alla voce, non il tempo speso: la documentazione è stata scritta dentro quasi tutte le voci di implementazione e di operations, quindi quella riga sottostima il suo peso.
 - **Esito per voce:** 5 accettate, 14 modificate, 1 mista (`AI-01`). **Nessuna voce è stata scartata per intero**; gli scarti (opzioni, ipotesi, rilievi di una revisione) stanno dentro le voci.
 - **Dove l'AI ha dato più valore:** velocità di lettura (traccia, documentazione, codice di 11 servizi), scrittura di manifest, script e documenti da controllare, esecuzione dei controlli ripetitivi.
 - **Dove ha sbagliato più spesso:** dichiarare «verificato» o «ok» prima di una prova vera, e dedurre dal codice un comportamento che il cluster ha poi smentito (esempi sotto). Il rimedio che ha funzionato è sempre stato lo stesso: eseguire.

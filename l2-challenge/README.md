@@ -241,12 +241,12 @@ Lavora solo su `k3d-boutique` e sul namespace `boutique-dev`. Sospende la Kustom
 | Cosa | Stato |
 |---|---|
 | Installazione con `apply-local.sh` da cluster cancellato (fase 3) | provata, 2026-11-19 |
-| **Installazione con Flux da cluster cancellato** | **non provata**: il bootstrap è stato eseguito una volta e rieseguito (idempotente) sul cluster esistente |
+| **Installazione con Flux da cluster cancellato** | **provata, 2026-11-23**: `k3d cluster delete`, `scripts/cluster-up.sh`, `scripts/flux-bootstrap.sh`. 6 Kustomization `Ready` circa 3 minuti dopo il bootstrap, nessun commit creato dal bootstrap, nessun intervento manuale |
 | Smoke test dev e prod | rieseguito il 2026-11-23: 7/7 in entrambi |
 | `kustomize build` + `kubeconform` dev e prod | rieseguito il 2026-11-23: 0 invalidi (50 e 47 risorse valide, il Secret cifrato escluso) |
 | Cluster in esecuzione | 6 Kustomization Flux `Ready`, dev 12/12 pod `Running` il 2026-11-23 |
 | Percorso di un **altro** utente (chiave age, fork, GHCR) | **non provato** |
-| README provato da zero su cluster pulito | **non fatto** (fase 10, primo punto) |
+| README provato da zero su cluster pulito | **fatto per il percorso A** (2026-11-23, riga sopra); smoke test 7/7 in dev e in prod, Grafana `/api/health` 200, 0 riavvii in `boutique-dev`, `boutique-prod` e `monitoring`. Il percorso B (`apply-local.sh`) non è stato rieseguito oggi (ultima prova 2026-11-19). **Fatto dallo stesso autore, sulla stessa macchina, con la chiave age già presente**: non è la prova di un altro utente |
 | Rollback GitOps di un commit sbagliato | **non provato** |
 
 Un quadro più dettagliato, comando per comando, è in [consistency-check.md](consistency-check.md).

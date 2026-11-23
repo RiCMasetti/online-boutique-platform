@@ -98,7 +98,8 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-17 | 8 | operations | Claude Code | Troubleshooting di Grafana in down (incidente reale, 23 nov): l'utente ipotizza la memoria | mod. | Ipotesi dell'utente **non confermata**: era la CPU. Il fix della PR #10 non ha retto: tornato al limite aprendo Metrics Drilldown (131 POST in 2 minuti); a schede chiuse 18-130 mCPU. Causa non provata |
 | AI-18 | 8 | operations | Claude Code | Fase 8: `scripts/break-it.sh` (5 guasti), `docs/runbook.md` | mod. | Tutti i guasti eseguiti e ripristinati in dev con tempi misurati. Un difetto del mio `restore` trovato provando il guasto; rollback GitOps non provato. Dettagli sotto |
 | AI-19 | 9 | analisi | Claude Code | Fase 9: valutazione di Krateo, chart wrapper `krateo/boutique-environment`, ADR 0005 | mod. | Documentazione letta da me/AI dal sito (19 pagine); chart con controlli statici passati; **nulla provato in Krateo**. Dettagli sotto |
-| AI-20 | 10 | documentazione | Claude Code | Fase 10: `l2-challenge/` (README, `ai-usage.md`, `consistency-check.md`), README della radice, correzione di documenti vecchi | mod. | Comandi del README rieseguiti sul cluster (smoke test, `kustomize`+`kubeconform`, `flux get`); **prova da zero con Flux non fatta**. Dettagli sotto |
+| AI-20 | 10 | documentazione | Claude Code | Fase 10: `l2-challenge/` (README, `ai-usage.md`, `consistency-check.md`), README della radice, correzione di documenti vecchi | mod. | Comandi del README rieseguiti sul cluster (smoke test, `kustomize`+`kubeconform`, `flux get`); prova da zero con Flux fatta in seguito, vedi AI-21. Dettagli sotto |
+| AI-21 | 10 | operations | Claude Code | Cancellazione e ricreazione del cluster k3d con `cluster-up.sh` e `flux-bootstrap.sh` (prova da zero del README, percorso A) | acc. | Kustomization, pod, riavvii, smoke test dev e prod, Grafana `/api/health`, Secret SOPS. Errori miei sotto |
 
 **AI-20, fase 10: documentazione finale (2026-11-23):**
 
@@ -280,6 +281,14 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 - *Log JSON, per configurazione nel codice:* Go (checkout, frontend, productcatalog, shipping) con logrus `JSONFormatter`; Node (currency, payment) con `pino`; Python (email, recommendation) con `python-json-logger`; adservice (Java) con `JsonLayout` di log4j2. **Nessuna configurazione JSON trovata** in `cartservice` (.NET), `loadgenerator` e `shoppingassistantservice`. L'ho dedotto dal codice, non l'ho osservato nei log: da riverificare con `kubectl logs` dopo il deploy (fase 2/5).
 - *Fuori dalla base:* `shoppingassistantservice` esiste in `src/` ma non nella base `kustomize/base`: è attivabile solo con il component `shopping-assistant`. Il piano parla di 11 servizi: i Deployment della base sono 12 con Redis.
 
+**AI-21, prova da zero con Flux (2026-11-23):**
+
+- *Prompt (dell'utente):* «Procediamo con la creazione del cluster da zero»; poi «Sì, aggiorna i documenti e apri la PR».
+- *Eseguito:* letti gli script e il README; verificati prerequisiti (k3d, flux, chiave age, `gh`); `k3d cluster delete boutique`; `scripts/cluster-up.sh`; `GITHUB_TOKEN="$(gh auth token)" scripts/flux-bootstrap.sh`; attesa delle Kustomization; `smoke-test.sh` su dev e prod; controllo dei Secret e delle deploy key su GitHub.
+- *Esito:* 6 Kustomization `Ready` circa 3 minuti dopo il bootstrap, il bootstrap non ha creato commit; dev 12, prod 13, monitoring 5 pod `Running`, 0 riavvii; smoke test 7/7 in dev e in prod; Grafana `/api/health` 200; Secret `redis-cart-auth` (dev, prod), `grafana-admin` e `sops-age` presenti.
+- *Errori dell'AI:* (1) lo script di attesa stampava «tutte Ready» dopo 15 s quando quattro Kustomization su sei non lo erano (estraeva male la colonna dall'output di `flux get`); l'ho riscritto leggendo le condizioni in JSON; (2) ho lanciato `smoke-test.sh dev` invece di passare l'URL: 7 FAIL con codice 000, nessuna colpa dei servizi; (3) ho scritto all'utente che la deploy key del vecchio cluster restava su GitHub: falso, `flux bootstrap` l'ha sostituita (ne risulta una sola).
+- *Limiti:* eseguita dallo stesso autore, sulla stessa macchina, con la chiave age già presente. Non rieseguiti `netpol-test.sh`, il percorso B, il login a Grafana né il rollback GitOps. Il tempo di circa 3 minuti è l'intervallo di un ciclo di attesa a passi di 15 s, non una misura precisa.
+
 ---
 
 ## Caso di troubleshooting con AI (obbligatorio)
@@ -314,6 +323,6 @@ _Aggiornare con esempi concreti man mano che emergono._
 |---|---|---|---|
 | Analisi | 4 (AI-01, 05, 06, 19) | lettura rapida di traccia, manifest, codice e documentazione; mappa dei servizi | assunzioni dedotte dal codice smentite dopo (service account, crash loop, `Ping()` del cartservice); Krateo da conoscenza generale finché non verificato |
 | Implementazione | 6 (AI-09, 10, 11, 12, 14, 16) | manifest, script, workflow e modifica al frontend pronti da provare; revisione con `code-review` | bug trovati solo eseguendo (build multi-arch, `kubeconform` e SOPS, `netpol-test.sh`, job `scan` verde ma vuoto) |
-| Operations | 7 (AI-02, 04, 07, 13, 15, 17, 18) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
+| Operations | 8 (AI-02, 04, 07, 13, 15, 17, 18, 21) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
 | Documentazione e demo | 2 (AI-03, 20) | documenti completi nella forma | invecchiano in silenzio e tendono all'ottimismo; checklist della demo non ancora scritta |
 | Governance | 1 (AI-08), più le regole sopra | decisioni mie con opzioni dell'AI; nessun segreto nei prompt | disciplina personale, non imposta da controlli automatici; revisione solo dello stesso strumento |
