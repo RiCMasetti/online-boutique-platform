@@ -45,7 +45,7 @@ Perché un branch e non un tag: Flux sceglie i tag solo con un intervallo semver
 ## 4. Rollback e modifiche manuali
 
 - **Rollback corretto:** `git revert <commit>` e push su `main` (o PR su `prod`). Flux riconcilia e riporta lo stato precedente. Provato in dev: il revert di un cambio di repliche ha riportato il Deployment al valore precedente in circa un minuto.
-- **`kubectl rollout undo` / `kubectl scale`:** non sono permanenti. Alla prossima riconciliazione (al più 10 minuti, o subito con un nuovo commit) Flux riporta l'oggetto a ciò che dice Git. *Non ancora provato*: è atteso dal modello di Flux, lo si verifica nella fase 8. Per un intervento manuale temporaneo serve `flux suspend kustomization <nome>` e poi `flux resume`.
+- **`kubectl rollout undo` / `kubectl scale`:** non sono permanenti. Alla prossima riconciliazione (al più 10 minuti, o subito con un nuovo commit) Flux riporta l'oggetto a ciò che dice Git. *Non provato*, nemmeno in fase 8 (vedi docs/runbook.md §4): è atteso dal modello di Flux, non una misura. Per un intervento manuale temporaneo serve `flux suspend kustomization <nome>` e poi `flux resume`.
 
 ## 5. Comandi utili
 
