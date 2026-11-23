@@ -90,7 +90,14 @@ I tempi di diagnosi non li ho misurati in modo onesto: i guasti li avevo scelti 
 - **Fix.** `kubectl scale deploy/frontend --replicas=1`. **Un `flux reconcile` non basta**: Git non dichiara `replicas` per il frontend, il campo non risulta tra quelli gestiti da `kustomize-controller` e Flux non lo corregge. L'ho scoperto perché il mio primo `restore` aveva dichiarato il ripristino con il frontend ancora a 0 (shop 503 per circa 3 minuti dopo); ora lo script reimposta le repliche e verifica.
 - **Verifica.** `smoke-test.sh`. Misurato: 18 s.
 
-### 3.6 Non provato
+### 3.6 Grafana lento o non pronto (incidente reale, non provocato)
+
+- **Sintomo.** Pod `2/3` (readiness in timeout), `kubectl top` a 1000m (il limite), in alternativa riavvii con `Exit Code 137` e `Reason: Error`.
+- **Diagnosi.** `kubectl top pod -n monitoring --containers`; `describe pod`: `Reason` (`OOMKilled` oppure `Error`, cioè liveness) e `Restart Count`; log del container `grafana`: molte `POST /api/ds/query` con `status=499` e referer `/dashboards` o `grafana-metricsdrilldown-app` indicano una pagina aperta nel browser che lancia centinaia di query.
+- **Causa osservata, non provata.** Il 23 novembre l'apertura della pagina Metrics Drilldown (una query per metrica) ha riportato Grafana al limite di CPU (131 POST in 2 minuti). A schede chiuse la CPU è scesa a 18-130 mCPU in circa 2 minuti. Non so se spiega anche i tre giorni a 4,4 core del 20-23 novembre (`docs/observability.md` §8).
+- **Azione.** Chiudere le schede di Grafana e attendere; non alzare il limite di memoria (non è la memoria). Correzioni strutturali non ancora applicate.
+
+### 3.7 Non provato
 
 - NetworkPolicy troppo restrittiva (scenario opzionale del piano): non eseguito.
 - Guasto di Redis: provato in fase 7 con `kubectl scale`, vedi `docs/observability.md` §8.
@@ -120,5 +127,5 @@ Procedura consigliata:
 
 - Il ripristino a stato di Git non basta, oppure il guasto torna dopo `restore`: la causa è in Git.
 - Più di un servizio coinvolto, o Redis non risponde (il carrello si perde: `redis-cart` non ha persistenza, vedi `docs/security.md`).
-- Il nodo è saturo (`kubectl top nodes` oltre l'80% di CPU): prima di cercare un guasto applicativo si guarda chi consuma (`kubectl top pod -A --containers`). È già successo con Grafana.
+- Il nodo è saturo (`kubectl top nodes` oltre l'80% di CPU): prima di cercare un guasto applicativo si guarda chi consuma (`kubectl top pod -A --containers`). È già successo con Grafana (vedi §3.6).
 - Prod: ogni intervento passa da Git e da una PR, mai da `kubectl`.
