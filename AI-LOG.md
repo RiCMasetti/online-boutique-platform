@@ -110,7 +110,10 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
   5. **Scartato:** "versione 93.6.0 non verificata": l'ho scaricata con `helm pull` dal repository e renderizzata. "Timeout di 5 minuti di observability-config": il timeout riguarda la sua applicazione, non l'attesa del `dependsOn`.
   6. **Riconosciuto, non corretto:** un Deployment cancellato non fa scattare `FrontendUnavailable` né `RedisDown` (nessuna serie): documentato come limite.
   Inoltre la PR era in conflitto con `main` (solo `AI-LOG.md`, dopo il merge della #8): risolto.
-- *Limiti dichiarati:* nulla di tutto questo è stato eseguito nel cluster: non so se l'HelmRelease si installa, se i target sono `up`, se le query della dashboard restituiscono dati, né se gli alert scattano. Il "done" della fase 7 non è raggiunto.
+- *Esito nel cluster dopo il merge (verificato da me, vedi `docs/observability.md` §8):* HelmRelease installato; target di dev `up`, di prod `down` (NetworkPolicy non ancora promosse: verificato che la causa è quella); 4 regole caricate, 11 query della dashboard con dati; guasto su Redis in dev con `RedisDown` firing a +78 s e `FrontendHigh5xxRate` a +162 s, rientrati dopo il ripristino.
+- *Un'ipotesi che avevo sbagliato:* avevo previsto che i problemi di risorse dello stack sarebbero stati la memoria (limiti stretti, ne ho alzati tre in revisione). Il problema vero è stato la **CPU di Grafana** (fino a 4,8 core), che avevo trascurato perché non c'era un limite: l'ha indicato l'utente ("credo che Grafana faccia andare in OOM o sovraccarichi la CPU"). Ho verificato: nessun OOMKill, ma CPU saturata e kill per liveness. Causa probabile (dashboard predefinite) non provata.
+- *Limite del test sul guasto:* è avvenuto durante il picco di Grafana, quindi i tempi misurati sono un limite superiore.
+- *Limiti dichiarati (valutazioni fatte prima del merge, tenute per memoria):* nulla di tutto questo era stato eseguito nel cluster: non sapevo se l'HelmRelease si installava, se i target sono `up`, se le query della dashboard restituiscono dati, né se gli alert scattano. Il "done" della fase 7 non è raggiunto.
 - *Da fare da me:* leggere i valori dell'HelmRelease e le regole prima del merge; il merge installa lo stack sul nodo condiviso.
 
 **AI-15, promozione di prod (2026-11-20):**

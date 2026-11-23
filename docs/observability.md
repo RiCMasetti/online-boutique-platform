@@ -146,7 +146,7 @@ Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch de
 
 ## 8. Stack di osservabilità (fase 7)
 
-**Stato: scritto e validato staticamente (`helm template`, `kustomize build`, `kubeconform`); non ancora installato nel cluster.** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
+**Stato (2026-11-20): installato da Flux e verificato in dev; prod in attesa della promozione delle NetworkPolicy (i suoi target sono `down`).** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
 
 | Cosa | Dove |
 |---|---|
@@ -169,4 +169,15 @@ Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch de
 
 **Limite noto degli alert:** se un Deployment viene cancellato, kube-state-metrics non emette più la serie `kube_deployment_status_replicas_available` e `FrontendUnavailable`/`RedisDown` non scattano (servirebbe un `absent()`). Flux ricrea l'oggetto al giro successivo.
 
-**Da verificare nel cluster** (e da annotare qui quando fatto): installazione dello stack da Flux, target `up` di frontend e redis-cart in dev e prod, query della dashboard con dati reali, un alert che scatta con un guasto provocato.
+**Verificato nel cluster (dev)**
+
+- Il `HelmRelease` si è installato (`Helm install succeeded`, chart 93.6.0); `observability-stack` e `observability-config` applicate da Flux.
+- Target `up`: frontend e redis-cart in dev. In **prod** sono `down` (`connection refused`): le NetworkPolicy di prod non ammettono ancora Prometheus, perché arriveranno con la prossima promozione `main → prod`. Verificato che la causa è questa: le policy di prod non contengono il namespace `monitoring`, mentre quelle di dev sì, e il frontend di prod risponde 200 dall'Ingress. L'alert `TargetDown` per prod è `firing`, come deve.
+- Le quattro regole sono caricate senza errori. Le 11 query della dashboard restituiscono dati reali per dev; Grafana ha caricato la dashboard `boutique-overview` e una query passata da Grafana al datasource `prometheus` risponde. **Non ho guardato la pagina disegnata.**
+- **Guasto provocato in dev** (Redis spento con `kubectl scale --replicas=0`, circa 7 minuti, poi ripristino): `RedisDown` in `pending` a +15 s, `firing` a +78 s; `FrontendHigh5xxRate` `pending` a +36 s, `firing` a +162 s; `/cart` 500 per tutta la durata; dopo il ripristino smoke test superato, nessun restart, i due alert rientrati entro 1-2 minuti. Non esercitati: `FrontendUnavailable`, `PodCrashLooping`, la ricezione degli alert in Alertmanager.
+
+**Problema trovato: Grafana saturava la CPU all'avvio.** Misurato su Prometheus (`container_cpu_usage_seconds_total`): per circa 15 minuti dopo l'installazione Grafana ha usato da 1,2 a 4,8 core (picco 4,77 alle 16:19) su 6, cioè circa il 95% della CPU di tutto il cluster, finché la probe di liveness (`/api/health`) non è fallita e il kubelet l'ha riavviato (exit 137, `Container grafana failed liveness probe`; **non** un OOMKill: nessun container del cluster risulta `OOMKilled`). Il primo riavvio, all'avvio, era un timeout (exit 1). Memoria al picco: 353 MiB su un limite di 384 (92%). Nei log dell'istanza uccisa: `Handler timeout` dell'apiserver interno di Grafana e `context canceled`. Dopo il riavvio Grafana è calmo (0,2-0,7 core).
+
+*Causa: ipotesi non provata.* Il sospetto è l'importazione di venti ConfigMap di dashboard predefinite (più la nostra) da parte del sidecar, che Grafana 13 scrive nel suo storage interno e va in timeout. Non ho fatto la prova decisiva (riavviare Grafana con meno dashboard e misurare). Correzione applicata: dashboard predefinite del chart disattivate (resta solo la nostra), limite di CPU di 1 core, memoria 512Mi. **Da riverificare dopo il merge** riavviando il pod e rileggendo la CPU.
+
+**Conseguenza sul test del guasto:** la prova del guasto è avvenuta mentre Grafana consumava fino a circa 4,8 core. Gli alert sono scattati comunque, ma i tempi misurati possono includere ritardi di raccolta e valutazione dovuti al nodo occupato: vanno letti come limite superiore. L'alert di default `CPUThrottlingHigh` per dev era `pending` in quel periodo; non l'ho indagato.
