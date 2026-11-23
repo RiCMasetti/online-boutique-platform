@@ -1,6 +1,6 @@
 # Osservabilità
 
-Stato a fine fase 5: il frontend espone metriche Prometheus. Prometheus, Grafana e gli alert arrivano in fase 7. Il resto della fase 5 è elencato in §6.
+Le sezioni 1-7 descrivono la fase 5 (metriche del frontend, immagine, Redis, log, probe). Prometheus, Grafana e gli alert della fase 7 sono nella sezione 8.
 
 ## 1. Metriche del frontend
 
@@ -140,9 +140,9 @@ Altre osservazioni, non corrette:
 - Il loadgenerator non ha probe (non espone porte).
 - Il frontend ha `timeoutSeconds: 1`: non ha dato problemi in circa 19 ore (0 riavvii), ma non l'ho messo sotto carico.
 
-## 8. Ancora da fare in fase 5
+### Rimasto dalla fase 5
 
-Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch degli altri servizi e la riverifica delle probe sono in fase 6.
+Blackbox exporter per il frontend (opzionale): **non fatto**. La build multi-arch degli altri servizi e la riverifica delle probe sono state fatte in fase 6 (docs/ci.md §4 e §5).
 
 ## 8. Stack di osservabilità (fase 7)
 

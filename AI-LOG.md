@@ -98,6 +98,16 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-17 | 8 | operations | Claude Code | Troubleshooting di Grafana in down (incidente reale, 23 nov): l'utente ipotizza la memoria | mod. | Ipotesi dell'utente **non confermata**: era la CPU. Il fix della PR #10 non ha retto: tornato al limite aprendo Metrics Drilldown (131 POST in 2 minuti); a schede chiuse 18-130 mCPU. Causa non provata |
 | AI-18 | 8 | operations | Claude Code | Fase 8: `scripts/break-it.sh` (5 guasti), `docs/runbook.md` | mod. | Tutti i guasti eseguiti e ripristinati in dev con tempi misurati. Un difetto del mio `restore` trovato provando il guasto; rollback GitOps non provato. Dettagli sotto |
 | AI-19 | 9 | analisi | Claude Code | Fase 9: valutazione di Krateo, chart wrapper `krateo/boutique-environment`, ADR 0005 | mod. | Documentazione letta da me/AI dal sito (19 pagine); chart con controlli statici passati; **nulla provato in Krateo**. Dettagli sotto |
+| AI-20 | 10 | documentazione | Claude Code | Fase 10: `l2-challenge/` (README, `ai-usage.md`, `consistency-check.md`), README della radice, correzione di documenti vecchi | mod. | Comandi del README rieseguiti sul cluster (smoke test, `kustomize`+`kubeconform`, `flux get`); **prova da zero con Flux non fatta**. Dettagli sotto |
+
+**AI-20, fase 10: documentazione finale (2026-11-23):**
+
+- *Prompt (dell'utente):* «Passiamo alla fase 10, in cosa consiste? Ricordamelo»; poi la proposta di una cartella `l2-challenge` con il nuovo README; poi «procedi con l'opzione 1» (README completo in `l2-challenge/`, README della radice ridotto a un rimando).
+- *Eseguito:* letti gli script, `docs/` e questo diario per scrivere `l2-challenge/README.md` e `ai-usage.md`; rieseguiti sul cluster `smoke-test.sh` (dev e prod, 7/7), `kustomize build` + `kubeconform` (0 invalidi), `flux get`, `flux logs`, `rollout history`, `break-it.sh status`, controllo dei Service e della chiave del Secret di Grafana (senza leggerne il valore); controllo dei link relativi nei documenti (3 rotti: i file che stavo ancora scrivendo).
+- *Trovato:* sei documenti rimasti indietro (README dei workflow, commento di `.sops.yaml`, `architecture.md`, `observability.md`, `gitops.md`, `security.md`) e cinque punti non corretti, tra cui `--context` mancante nei comandi dei documenti e documenti upstream con comandi mai eseguiti. Dettagli in `l2-challenge/consistency-check.md`.
+- *Errori miei corretti scrivendo:* (1) avevo scritto che i log JSON erano in «10 servizi su 12»: sono 9 su 11 (`docs/observability.md` §6); (2) avevo attribuito le *requests* del nodo a uno stato con lo stack acceso, ma il dato (60%/30%) era di prima dello stack: rimisurato 66% CPU e 40% memoria; (3) avevo scritto «tre rilievi accettati» per la revisione di AI-16: sono quattro accettati, uno scartato, uno riconosciuto; (4) il primo `gh pr list` ha interrogato il repository upstream di Google e non il fork: me ne sono accorto leggendo i titoli delle PR.
+- *Non fatto:* la prova da zero del README con Flux su un cluster cancellato (distruttiva e scrive sul repository: da decidere con l'utente) e il percorso di un altro utente.
+- *Da fare da me:* rileggere `l2-challenge/ai-usage.md` (sintesi scritta dall'AI sul proprio uso, quindi con il rischio di favorire se stessa) e decidere cosa fare dei documenti upstream.
 
 **AI-19, fase 9: valutazione di Krateo (2026-11-23):**
 
@@ -274,7 +284,7 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 
 ## Caso di troubleshooting con AI (obbligatorio)
 
-_Da compilare nella fase 8. Struttura suggerita:_
+_Il caso è **AI-17** (Grafana, incidente reale del 23 novembre), nel registro sopra: prompt verbatim, ipotesi dell'utente (sbagliata), cosa era incompleto nel lavoro dell'AI, verifiche, esito e limiti. Il transcript sanitizzato in `docs/ai/` **non è stato creato**: la sintesi è in AI-17. Struttura suggerita originale:_
 
 - **Scenario:** quale guasto, come è stato provocato
 - **Sintomi osservati:** stato dei pod, eventi, log (sanitizzati)
@@ -298,12 +308,12 @@ _Aggiornare con esempi concreti man mano che emergono._
 
 ---
 
-## Riepilogo finale (da compilare alla fase 10)
+## Riepilogo finale (fase 10, sintesi completa in `l2-challenge/ai-usage.md`)
 
 | Area | N. voci | Valore principale | Limite principale |
 |---|---|---|---|
-| Analisi | | | |
-| Implementazione | | | |
-| Operations | | | |
-| Documentazione e demo | | | |
-| Governance | | | |
+| Analisi | 4 (AI-01, 05, 06, 19) | lettura rapida di traccia, manifest, codice e documentazione; mappa dei servizi | assunzioni dedotte dal codice smentite dopo (service account, crash loop, `Ping()` del cartservice); Krateo da conoscenza generale finché non verificato |
+| Implementazione | 6 (AI-09, 10, 11, 12, 14, 16) | manifest, script, workflow e modifica al frontend pronti da provare; revisione con `code-review` | bug trovati solo eseguendo (build multi-arch, `kubeconform` e SOPS, `netpol-test.sh`, job `scan` verde ma vuoto) |
+| Operations | 7 (AI-02, 04, 07, 13, 15, 17, 18) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
+| Documentazione e demo | 2 (AI-03, 20) | documenti completi nella forma | invecchiano in silenzio e tendono all'ottimismo; checklist della demo non ancora scritta |
+| Governance | 1 (AI-08), più le regole sopra | decisioni mie con opzioni dell'AI; nessun segreto nei prompt | disciplina personale, non imposta da controlli automatici; revisione solo dello stesso strumento |

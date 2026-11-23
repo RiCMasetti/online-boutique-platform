@@ -19,12 +19,15 @@ Ogni decisione va riportata in `docs/adr/` con data, contesto e trade-off.
 
 ```
 .
-├── README.md                    # prerequisiti, build, deploy, test, demo, motivazione scelta app
+├── README.md                    # rimando a l2-challenge/ e attribuzione a upstream
+├── l2-challenge/
+│   ├── README.md                # prerequisiti, build, deploy, test, demo, motivazione scelta app
+│   ├── ai-usage.md              # uso AI (vedi AI-LOG.md)
+│   └── consistency-check.md     # controllo di coerenza dei documenti
 ├── docs/
 │   ├── architecture.md          # componenti, flussi gRPC/HTTP, diagramma
 │   ├── runbook.md               # verifica, troubleshooting, rollback
 │   ├── krateo-evaluation.md     # valutazione + disegno di integrazione
-│   ├── ai-usage.md              # uso AI (vedi AI-LOG.md)
 │   ├── demo-checklist.md
 │   └── adr/
 ├── AI-LOG.md                    # diario vivo di prompt/output/verifiche (da giorno 1)
@@ -157,10 +160,10 @@ Fase più pesante: dedicale tempo vero.
 **Done quando (dedotto dagli item):** raccomandazione scritta con distinzione PoC/blueprint/adozione. Raggiunto come blueprint; il PoC non c'è.
 
 ### Fase 10 — Documentazione finale e sezione AI (M)
-- [ ] README completo (prerequisiti, build, deploy, test, demo) **provato da zero su un cluster pulito**.
-- [ ] Sezione "Perché Online Boutique" con link, dominio e parti usate.
-- [ ] `docs/ai-usage.md`: cinque aree richieste dalla traccia (analisi, implementazione, operations, documentazione/demo, governance), con limiti e valore.
-- [ ] Controllo di coerenza: nessun comando nei doc che non hai eseguito.
+- [ ] README completo (prerequisiti, build, deploy, test, demo) **provato da zero su un cluster pulito**. _Scritto in `l2-challenge/README.md` (README della radice ridotto a un rimando). **La prova da zero con Flux non è fatta**: lo stato della verifica è nel README. Percorso di un altro utente (chiave age, fork, GHCR) non provato._
+- [x] Sezione "Perché Online Boutique" con link, dominio e parti usate. _In `l2-challenge/README.md`._
+- [x] `ai-usage.md`: cinque aree richieste dalla traccia (analisi, implementazione, operations, documentazione/demo, governance), con limiti e valore. _In `l2-challenge/ai-usage.md`, non in `docs/`. Non riletto da me: da rivedere._
+- [x] Controllo di coerenza: nessun comando nei doc che non hai eseguito. _`l2-challenge/consistency-check.md`: sette incoerenze corrette, cinque no. **I documenti upstream (`docs/development-guide.md` e simili) hanno comandi non eseguiti**; tolti o no, da decidere._
 
 ### Fase 11 — Prova generale della demo (S-M)
 - [ ] `docs/demo-checklist.md` con i comandi in ordine e i tempi.

@@ -1,11 +1,11 @@
-# GitHub Actions Workflows
+# GitHub Actions
 
-Questo fork usa un sottoinsieme dei workflow upstream. I workflow che si autenticavano sul progetto Google Cloud di upstream (deploy su GKE, cleanup, release) sono stati rimossi perché non possono funzionare su un fork. Restano nella history e nel remote `upstream`.
+Questo fork usa i workflow della piattaforma (fase 6, descritti in [docs/ci.md](../../docs/ci.md)). I workflow upstream che si autenticavano sul progetto Google Cloud (deploy su GKE, cleanup, release) e i due che provavano solo alcuni servizi (`ci-pr.yaml`, `ci-main.yaml`) sono stati rimossi o sostituiti; restano nella cronologia e nel remote `upstream`.
 
-| Workflow | Cosa fa |
-|---|---|
-| [ci-pr.yaml](ci-pr.yaml) | Test unitari Go e C# su ogni pull request verso `main` |
-| [ci-main.yaml](ci-main.yaml) | Gli stessi test su ogni push su `main` e `release/*` |
-| [kustomize-build-ci.yaml](kustomize-build-ci.yaml) | Build delle base Kustomize upstream. Sarà sostituito dalla CI del progetto (fase 6) |
-
-La CI di piattaforma (lint, `kubeconform`, build e push su GHCR) viene aggiunta nella fase 6 del piano di lavoro.
+| Workflow | Quando | Cosa fa |
+|---|---|---|
+| [checks.yaml](checks.yaml) | riusabile | `hadolint`, `kustomize build` + `kubeconform` su dev, prod e osservabilità, `promtool` sulle regole, `go test` e `dotnet test` |
+| [build-images.yaml](build-images.yaml) | riusabile | build per servizio e architettura (`amd64`, `arm64`, runner nativi) e manifest multi-arch |
+| [ci.yaml](ci.yaml) | PR verso `main` | controlli, più build senza push dei servizi modificati |
+| [release.yaml](release.yaml) | push su `main` (`src/**` o workflow) o a mano | controlli, build e push su GHCR di tutti gli 11 servizi, scansione Trivy (non bloccante), commit del tag in `deploy/components/dev-images` |
+| [kustomize-build-ci.yaml](kustomize-build-ci.yaml) | upstream, invariato | build delle cartelle Kustomize upstream in `kustomize/` |
