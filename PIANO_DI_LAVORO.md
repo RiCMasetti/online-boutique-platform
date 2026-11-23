@@ -132,15 +132,15 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 
 ### Fase 8 — Failure scenario, runbook, rollback (L) — Troubleshooting 20%
 Fase più pesante: dedicale tempo vero.
-- [ ] `scripts/break-it.sh` con almeno 3 guasti riproducibili:
+- [x] `scripts/break-it.sh` con almeno 3 guasti riproducibili. _Cinque scenari (`image-tag`, `bad-addr`, `missing-addr`, `low-memory`, `frontend-down`) più `restore` e `status`; tutti eseguiti in dev, ripristino 6-21 s. Il test con NetworkPolicy (opzionale) non è stato fatto._
   1. Tag immagine inesistente → `ImagePullBackOff`.
   2. Variabile `*_SERVICE_ADDR`: **sbagliata** (valore non vuoto) → pod sani ma errori gRPC/500 a ogni richiesta; **rimossa o vuota** → `CrashLoopBackOff` (es. checkout o frontend). Dal codice i client gRPC sono lazy (`grpc.NewClient`), quindi il crash loop non si ottiene con un valore sbagliato. Vedi `docs/architecture.md` §4; da confermare a runtime.
   3. Limite memoria troppo basso → `OOMKilled`.
   - (opzionale) NetworkPolicy troppo restrittiva → timeout tra servizi.
-- [ ] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica.
-- [ ] **Caso AI di troubleshooting** (obbligatorio): incolla (senza secret) eventi e log, registra prompt, ipotesi dell'AI, cosa hai verificato, cosa era sbagliato o incompleto.
-- [ ] Rollback GitOps: `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
-- [ ] `docs/runbook.md`: checklist di verifica, albero di diagnosi, rollback, criteri di escalation.
+- [x] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica. _In `docs/runbook.md` §3. Tempi di diagnosi non misurati in modo onesto: i guasti erano scelti da me._
+- [x] **Caso AI di troubleshooting** (obbligatorio; _AI-17: l'incidente reale di Grafana del 23 novembre, non un guasto costruito_): incolla (senza secret) eventi e log, registra prompt, ipotesi dell'AI, cosa hai verificato, cosa era sbagliato o incompleto.
+- [ ] Rollback GitOps (_documentato in `docs/runbook.md` §4, **non provato**: serve un commit sbagliato su `main`_): `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
+- [x] `docs/runbook.md`: checklist di verifica, albero di diagnosi, rollback, criteri di escalation.
 
 **Done quando:** puoi rompere e riparare ogni scenario in meno di 5 minuti, spiegando la diagnosi.
 
