@@ -51,6 +51,8 @@ Prova 1 comprende anche `scripts/netpol-test.sh` (75 s, tutte le NetworkPolicy v
 - **Il job `helm-install-traefik`** compare `Completed` con 1 o 2 riavvii: è il job di installazione di k3s, non un'anomalia dell'app.
 - **Password di Grafana.** `scripts/ops.sh grafana` la stampa in chiaro: non farlo con lo schermo condiviso; usare `scripts/ops.sh grafana --copy`.
 
+**Le due prove generali sono state fatte prima della promozione a prod del 2026-11-24** (PR #23): in entrambe prod era a `prod@7a723188` e i suoi target Prometheus erano `down`, cosa che i tempi della tabella non mostrano. Dopo la promozione un cluster nuovo parte con prod a `prod@c2af201e` e i target `up`; **questo non è stato provato con un cluster ricreato**, solo con il cluster già in esecuzione (target `up` circa 50 s dopo l'applicazione di Flux). Un terzo giro da cluster distrutto lo confermerebbe.
+
 ## 3. Rollback (passo 9)
 
 Il rollback richiede un commit sbagliato su `main`, quindi due PR. Sequenza provata il 2026-11-24 e **ordine corretto** (quello provato aveva un errore di ordine, descritto in [runbook.md](runbook.md) §4):
