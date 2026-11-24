@@ -166,9 +166,9 @@ Fase più pesante: dedicale tempo vero.
 - [x] Controllo di coerenza: nessun comando nei doc che non hai eseguito. _`l2-challenge/consistency-check.md`: sette incoerenze corrette, cinque no. **I documenti upstream (`docs/development-guide.md` e simili) hanno comandi non eseguiti**; tolti o no, da decidere._
 
 ### Fase 11 — Prova generale della demo (S-M)
-- [ ] `docs/demo-checklist.md` con i comandi in ordine e i tempi.
-- [ ] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte.
-- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`.
+- [x] `docs/demo-checklist.md` con i comandi in ordine e i tempi. _Fatta il 2026-11-24; il passo 7 (CI) e il rollback non sono stati rimisurati di seguito._
+- [ ] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte. _Fatte due prove il 2026-11-24 (circa 4 e 5 min fino allo shop funzionante, smoke test 7/7 in dev e prod). Restano aperte: nessuna delle due è «a demo finita» (passi 7 e 9 non rifatti), e la seconda ha avuto 3 riavvii a freddo per probe di liveness. Vedi `docs/demo-checklist.md`._
+- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`. _Provato solo che `k3d cluster stop/start` conserva le immagini (nessun pull dopo il riavvio); **non provato con la rete staccata** né `k3d image import`._
 
 ## 3bis. Calendario (10 giorni)
 
