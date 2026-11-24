@@ -185,7 +185,7 @@ scripts/netpol-test.sh                                         # le NetworkPolic
 | 10 | Valutazione Krateo | [docs/krateo-evaluation.md](../docs/krateo-evaluation.md), [ADR 0005](../docs/adr/0005-krateo-non-adottare-ora.md) |
 | 11 | Uso dell'AI | [ai-usage.md](ai-usage.md), [AI-LOG.md](../AI-LOG.md) |
 
-La checklist con i tempi e la prova generale da cluster distrutto sono della fase 11 e **non esistono ancora**.
+La checklist con i tempi misurati nelle due prove generali da cluster distrutto è in [docs/demo-checklist.md](../docs/demo-checklist.md).
 
 ## Aggiornamento, promozione e rollback
 
