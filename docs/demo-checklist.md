@@ -19,24 +19,24 @@ Chiudi le pagine di Grafana che non servono: con molte query aperte saturano la 
 
 Le colonne sono le due prove complete da cluster distrutto. «Tempo» è dall'avvio del passo; la riga «Totale» è dall'inizio della prova.
 
-| # | Passo della demo | Comando | Prova 1 | Prova 2 |
-|---|---|---|---|---|
-| 1 | Struttura del repository | `tree -L 2 -d` e [README](../l2-challenge/README.md) | non cronometrato | non cronometrato |
-| 2 | Build dell'immagine | vedi sotto | non cronometrato | non cronometrato |
-| 3a | Cancellare il cluster | `k3d cluster delete boutique` | 1 s | 2 s |
-| 3b | Creare il cluster | `scripts/cluster-up.sh` | 56 s | 67 s |
-| 3c | Installare Flux | `GITHUB_TOKEN="$(gh auth token)" scripts/flux-bootstrap.sh` | 35 s | 49 s |
-| 3d | Tutte le Kustomization `Ready` | `flux --context k3d-boutique get kustomizations` | circa 2 min 25 s dopo il bootstrap | circa 3 min dopo il bootstrap |
-| | **Totale: da cluster distrutto a shop funzionante** | | **circa 4 min** | **circa 5 min** |
-| 4 | Pod, service, ingress, configurazione | `scripts/ops.sh status` | 2 s | — |
-| 5 | Endpoint principali | `scripts/smoke-test.sh` (dev), poi con `http://boutique-prod.localtest.me:8080` (prod) | 7/7 dev e prod, 3 s | 7/7 dev e prod, 4 s |
-| 6 | Health, log, metriche | `scripts/ops.sh grafana`, poi `scripts/ops.sh -n dev logs frontend --tail 5` | Grafana `/api/health` 200 | Grafana `/api/health` 200 |
-| 7 | Aggiornamento e rollout | PR → CI → Flux ([ci.md](ci.md)) | non rifatto: CI 2 min 41 s – 3 min 18 s (ultime tre esecuzioni, da `gh run list`) più circa 40-55 s di Flux | non rifatto |
-| 8 | Guasto | `scripts/break-it.sh image-tag` | guasto in 3 s, sintomo visibile entro 25 s | non rifatto |
-| 8 | Ripristino | `scripts/break-it.sh restore` | 10 s, smoke test 7/7 | non rifatto |
-| 9 | Rollback | vedi §3 | misurato il 2026-11-24 prima delle prove ([runbook.md](runbook.md) §4) | non rifatto |
-| 10 | Krateo | [krateo-evaluation.md](krateo-evaluation.md), [ADR 0005](adr/0005-krateo-non-adottare-ora.md) | solo da raccontare | — |
-| 11 | Uso dell'AI | [ai-usage.md](../l2-challenge/ai-usage.md), [AI-LOG.md](../AI-LOG.md) | solo da raccontare | — |
+| # | Passo della demo | Comando | Prova 1 | Prova 2 | Prova 3 |
+|---|---|---|---|---|---|
+| 1 | Struttura del repository | `tree -L 2 -d` e [README](../l2-challenge/README.md) | non cronometrato | non cronometrato | non cronometrato |
+| 2 | Build dell'immagine | vedi sotto | non cronometrato | non cronometrato | non cronometrato |
+| 3a | Cancellare il cluster | `k3d cluster delete boutique` | 1 s | 2 s | 4 s |
+| 3b | Creare il cluster | `scripts/cluster-up.sh` | 56 s | 67 s | 77 s |
+| 3c | Installare Flux | `GITHUB_TOKEN="$(gh auth token)" scripts/flux-bootstrap.sh` | 35 s | 49 s | 31 s |
+| 3d | Tutte le Kustomization `Ready` | `flux --context k3d-boutique get kustomizations` | circa 2 min 25 s dopo il bootstrap | circa 3 min dopo il bootstrap | circa 3 min dopo il bootstrap |
+| | **Totale: da cluster distrutto a shop funzionante** | | **circa 4 min** | **circa 5 min** | **circa 5 min** |
+| 4 | Pod, service, ingress, configurazione | `scripts/ops.sh status` | 2 s | — | — |
+| 5 | Endpoint principali | `scripts/smoke-test.sh` (dev), poi con `http://boutique-prod.localtest.me:8080` (prod) | 7/7 dev e prod, 3 s | 7/7 dev e prod, 4 s | 7/7 dev e prod, 2 s |
+| 6 | Health, log, metriche | `scripts/ops.sh grafana`, poi `scripts/ops.sh -n dev logs frontend --tail 5` | Grafana `/api/health` 200 | Grafana `/api/health` 200 | non rifatto |
+| 7 | Aggiornamento e rollout | PR → CI → Flux ([ci.md](ci.md)) | non rifatto: CI 2 min 41 s – 3 min 18 s (ultime tre esecuzioni, da `gh run list`) più circa 40-55 s di Flux | non rifatto | non rifatto |
+| 8 | Guasto | `scripts/break-it.sh image-tag` | guasto in 3 s, sintomo visibile entro 25 s | non rifatto | non rifatto |
+| 8 | Ripristino | `scripts/break-it.sh restore` | 10 s, smoke test 7/7 | non rifatto | non rifatto |
+| 9 | Rollback | vedi §3 | misurato il 2026-11-24 prima delle prove ([runbook.md](runbook.md) §4) | non rifatto | non rifatto |
+| 10 | Krateo | [krateo-evaluation.md](krateo-evaluation.md), [ADR 0005](adr/0005-krateo-non-adottare-ora.md) | solo da raccontare | — | — |
+| 11 | Uso dell'AI | [ai-usage.md](../l2-challenge/ai-usage.md), [AI-LOG.md](../AI-LOG.md) | solo da raccontare | — | — |
 
 Prova 1 comprende anche `scripts/netpol-test.sh` (75 s, tutte le NetworkPolicy verificate come bloccanti): non è nel percorso della demo, ma è il modo di mostrare la sicurezza di rete.
 
@@ -46,10 +46,12 @@ Prova 1 comprende anche `scripts/netpol-test.sh` (75 s, tutte le NetworkPolicy v
 
 ## 2. Cosa è andato storto nelle prove
 
-- **Riavvii a freddo (prova 2).** Tre pod (`emailservice`, e `recommendationservice` in dev e in prod) hanno avuto **un riavvio** ciascuno, codice 137, causa «Liveness probe failed: timeout … within 1s». Nella prova 1 non c'è stato nessun riavvio. La mia ipotesi è la contesa di CPU all'avvio, quando il nodo crea insieme dev, prod e lo stack di osservabilità; **non l'ho provata**. Conseguenza per la demo: dopo il bootstrap, `RESTARTS` di questi pod può essere 1 senza che sia un guasto. Se si vuole mostrare uno zero pulito, aspettare qualche minuto non basta: il contatore non si azzera.
+- **Riavvii a freddo (solo prova 2; la prova 3 non ne ha avuti).** Tre pod (`emailservice`, e `recommendationservice` in dev e in prod) hanno avuto **un riavvio** ciascuno, codice 137, causa «Liveness probe failed: timeout … within 1s». Nella prova 1 non c'è stato nessun riavvio. La mia ipotesi è la contesa di CPU all'avvio, quando il nodo crea insieme dev, prod e lo stack di osservabilità; **non l'ho provata**. Conseguenza per la demo: dopo il bootstrap, `RESTARTS` di questi pod può essere 1 senza che sia un guasto. Se si vuole mostrare uno zero pulito, aspettare qualche minuto non basta: il contatore non si azzera.
 - **Dipendenze di Flux.** Nei primi minuti `observability-config` e `observability-stack` sono `False` con «dependency … is not ready»: è l'ordine `dependsOn`, normale. Lo stesso si è visto dopo lo stop e il riavvio del cluster, e si è risolto da solo in circa 2,5 minuti.
 - **Il job `helm-install-traefik`** compare `Completed` con 1 o 2 riavvii: è il job di installazione di k3s, non un'anomalia dell'app.
 - **Password di Grafana.** `scripts/ops.sh grafana` la stampa in chiaro: non farlo con lo schermo condiviso; usare `scripts/ops.sh grafana --copy`.
+
+**Le prove 1 e 2 sono state fatte prima della promozione a prod del 2026-11-24** (PR #23): in entrambe prod era a `prod@7a723188` e i suoi target Prometheus erano `down`, cosa che i tempi della tabella non mostrano. **La prova 3 è stata fatta dopo la promozione**: prod parte da `prod@c2af201e` e tutti e 5 i target Prometheus (frontend e `redis-cart` di dev, frontend ×2 e `redis-cart` di prod) erano `up` circa 5 min 40 s dopo l'avvio (misura con interrogazioni ogni 15 s, quindi con un'incertezza di quell'ordine). Nessun container con riavvii, a parte il job `helm-install-traefik` di k3s.
 
 ## 3. Rollback (passo 9)
 

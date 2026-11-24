@@ -6,8 +6,8 @@ Questo documento è la sintesi. Il materiale grezzo, con prompt, decisioni ed er
 
 ## In breve
 
-- **21 voci** nel diario (`AI-01`…`AI-21`), fasi 0-10. Per area: analisi 4, implementazione 6, operations 8, documentazione 2, governance 1. La suddivisione è l'etichetta data alla voce, non il tempo speso: la documentazione è stata scritta dentro quasi tutte le voci di implementazione e di operations, quindi quella riga sottostima il suo peso.
-- **Esito per voce:** 5 accettate, 14 modificate, 1 mista (`AI-01`). **Nessuna voce è stata scartata per intero**; gli scarti (opzioni, ipotesi, rilievi di una revisione) stanno dentro le voci.
+- **23 voci** nel diario (`AI-01`…`AI-23`), fasi 0-11 (le voci 22 e 23 sono state scritte dopo la prima stesura di questo documento). Per area: analisi 4, implementazione 6, operations 10, documentazione 2, governance 1. La suddivisione è l'etichetta data alla voce, non il tempo speso: la documentazione è stata scritta dentro quasi tutte le voci di implementazione e di operations, quindi quella riga sottostima il suo peso.
+- **Esito per voce:** 6 accettate, 16 modificate, 1 mista (`AI-01`). La versione precedente di questa riga diceva 5 accettate: il conteggio era sbagliato già con 21 voci. **Nessuna voce è stata scartata per intero**; gli scarti (opzioni, ipotesi, rilievi di una revisione) stanno dentro le voci.
 - **Dove l'AI ha dato più valore:** velocità di lettura (traccia, documentazione, codice di 11 servizi), scrittura di manifest, script e documenti da controllare, esecuzione dei controlli ripetitivi.
 - **Dove ha sbagliato più spesso:** dichiarare «verificato» o «ok» prima di una prova vera, e dedurre dal codice un comportamento che il cluster ha poi smentito (esempi sotto). Il rimedio che ha funzionato è sempre stato lo stesso: eseguire.
 
@@ -61,7 +61,7 @@ Questo documento è la sintesi. Il materiale grezzo, con prompt, decisioni ed er
 - Il controllo di coerenza della fase 10 ([consistency-check.md](consistency-check.md)) ne ha trovati altri.
 - Dove un comando non è stato eseguito, i documenti lo dicono («non provato»). È una regola, non un'abitudine dell'AI: l'ho dovuta chiedere e ricontrollare.
 
-**Demo:** la checklist con i comandi e i tempi (fase 11) **non esiste ancora**.
+**Demo:** la checklist con i comandi e i tempi è in [docs/demo-checklist.md](../docs/demo-checklist.md), scritta dopo due prove da cluster distrutto (`AI-23`). Non è provata la demo con la rete staccata, né un cluster ricreato dopo la promozione a prod.
 
 ## 5. Governance
 
@@ -69,12 +69,12 @@ Regole che ho applicato (bozza in [AI-LOG.md](../AI-LOG.md), con gli esempi):
 
 | Regola | Come è stata applicata |
 |---|---|
-| Nessun segreto nei prompt né nel repository | la chiave age privata non è mai stata stampata né incollata in un prompt; token solo da variabile d'ambiente; `gitleaks` su 2785 commit senza rilievi; `.gitignore` esclude chiavi e file in chiaro |
+| Nessun segreto nei prompt né nel repository | la chiave age privata non è mai stata stampata né incollata in un prompt; token solo da variabile d'ambiente; `gitleaks` su 2785 commit senza rilievi (rieseguito il 2026-11-24 su 2827 commit, senza rilievi); una password locale di Grafana è però finita nell'output di una sessione (`AI-23`); `.gitignore` esclude chiavi e file in chiaro |
 | Nessun comando eseguito senza averlo capito | script letti riga per riga prima di eseguirli; per le voci critiche la lista «Verifica» spuntata da me |
 | Distruttivo solo con permesso | le azioni distruttive sono passate dal sistema di permessi: due volte sono state bloccate (`git reset --hard`, installazione di `actionlint`) e non le ho aggirate |
 | «Plausibile» non è «funzionante» | un suggerimento vale dopo una prova eseguita; le voci riportano cosa **non** è stato verificato |
 | Le fonti ufficiali prevalgono | documentazione Krateo letta dal sito, versione del chart scaricata con `helm pull` prima di fidarsi |
-| Le decisioni sono mie | opzioni proposte dall'AI, scelta mia: immagini multi-arch (`AI-08`), promozione di prod; i merge delle PR li faccio io |
+| Le decisioni sono mie | opzioni proposte dall'AI, scelta mia: immagini multi-arch (`AI-08`), promozione di prod; di norma i merge delle PR li faccio io, **con eccezioni**: nelle sessioni del 2026-11-24 Claude Code ha unito le PR #19, #20 (prova del rollback) e #23 (promozione a prod) dopo un mio via libera al piano e non al singolo merge (`AI-22`, `AI-23`) |
 
 **Limite:** nulla di questo è imposto da un controllo automatico, salvo `gitleaks` in pre-commit e i controlli in CI. Il resto è disciplina personale, quindi dipende da me.
 

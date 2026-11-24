@@ -51,39 +51,39 @@ Ogni decisione va riportata in `docs/adr/` con data, contesto e trade-off.
 L'ordine è pensato per avere presto una **fetta verticale funzionante** (app in cluster) e iterare. Le stime sono in effort relativo (S/M/L) perché non conosco la tua scadenza.
 
 ### Fase 0 — Setup e governance (S)
-- [ ] Fork di `GoogleCloudPlatform/microservices-demo` su GitHub (**pubblico fin dal giorno 1**: un fork di un repo pubblico non può essere reso privato) e clone.
-- [ ] Igiene del repo prima del primo commit: `.gitignore` (chiavi age, `.env`, kubeconfig), pre-commit con `gitleaks`, disattiva o rimuovi i workflow upstream che non servono.
-- [ ] Verifica tool: Docker, k3d, kubectl, kustomize, flux CLI, sops, age, kubeconform, hadolint.
-- [ ] Verifica risorse Docker: servono circa 6-8 GB di RAM per app + stack Prometheus.
-- [ ] Crea `AI-LOG.md` con il template (strumento, obiettivo, prompt, output, accettato/modificato/scartato, verifica).
-- [ ] Prima ADR: scelte della tabella sopra.
+- [x] Fork di `GoogleCloudPlatform/microservices-demo` su GitHub (**pubblico fin dal giorno 1**: un fork di un repo pubblico non può essere reso privato) e clone. _Verificato il 2026-11-24: `gh repo view` → fork, `PUBLIC`, genitore `GoogleCloudPlatform/microservices-demo`._
+- [x] Igiene del repo prima del primo commit: `.gitignore` (chiavi age, `.env`, kubeconfig), pre-commit con `gitleaks`, disattiva o rimuovi i workflow upstream che non servono. _Verificato il 2026-11-24: `.gitignore` con `*.agekey`, `age.key`, `keys.txt`, `.env*`, `kubeconfig*`; hook `gitleaks` in `.pre-commit-config.yaml`; `gitleaks` su 2827 commit senza rilievi; workflow upstream legati a GCP rimossi (`5b171834`, `20506cbe`). Resta `kustomize-build-ci.yaml` di upstream, che non ha avuto esecuzioni._
+- [x] Verifica tool: Docker, k3d, kubectl, kustomize, flux CLI, sops, age, kubeconform, hadolint. _Verificato il 2026-11-24: tutti presenti nel `PATH`, versioni provate nel README di `l2-challenge/`._
+- [x] Verifica risorse Docker: servono circa 6-8 GB di RAM per app + stack Prometheus. _Docker a 6 CPU e circa 9,7 GiB; uso reale misurato il 2026-11-23 (README di `l2-challenge/`)._
+- [x] Crea `AI-LOG.md` con il template (strumento, obiettivo, prompt, output, accettato/modificato/scartato, verifica). _Esiste._
+- [x] Prima ADR: scelte della tabella sopra. _`docs/adr/0001-scelte-di-progetto.md` più altri quattro ADR._
 
 **Done quando:** repo pronto e AI-LOG con la prima voce.
 
 ### Fase 1 — Analisi dell'applicazione (M) — peso 18%
-- [ ] Esplora la struttura: servizi, linguaggi, porte, variabili d'ambiente `*_SERVICE_ADDR`, dipendenze.
-- [ ] Usa l'AI per la mappa iniziale e **valida a mano** leggendo manifest e `.proto`; annota cosa hai confermato e cosa hai corretto.
-- [ ] Disegna il diagramma: browser → frontend (HTTP) → servizi (gRPC) → Redis (cart).
-- [ ] Mappa i componenti richiesti dalla traccia sull'app reale: *API Service* = frontend, *DB/cache* = Redis, *worker* = non presente (loadgenerator come generatore di traffico). Dichiaralo apertamente.
-- [ ] Elenca i punti critici di deploy: ordine di avvio, dipendenze, risorse, Redis non persistente.
+- [x] Esplora la struttura: servizi, linguaggi, porte, variabili d'ambiente `*_SERVICE_ADDR`, dipendenze. _`docs/architecture.md` §2-3._
+- [x] Usa l'AI per la mappa iniziale e **valida a mano** leggendo manifest e `.proto`; annota cosa hai confermato e cosa hai corretto. _`docs/architecture.md` §9 «Come ho validato questa analisi»._
+- [x] Disegna il diagramma: browser → frontend (HTTP) → servizi (gRPC) → Redis (cart). _Diagramma Mermaid in `docs/architecture.md` §1._
+- [x] Mappa i componenti richiesti dalla traccia sull'app reale: *API Service* = frontend, *DB/cache* = Redis, *worker* = non presente (loadgenerator come generatore di traffico). Dichiaralo apertamente. _Tabella nel README di `l2-challenge/` e in `docs/architecture.md` (riga «Worker: non presente»)._
+- [x] Elenca i punti critici di deploy: ordine di avvio, dipendenze, risorse, Redis non persistente. _`docs/architecture.md` §7._
 
 **Done quando:** `docs/architecture.md` con diagramma e tabella servizio/protocollo/dipendenze.
 
 ### Fase 2 — Cluster e deploy base (M)
-- [ ] `scripts/cluster-up.sh`: `k3d cluster create` con port-mapping `8080:80@loadbalancer`.
-- [ ] Deploy della base upstream con `kubectl apply -k` come primo test (poi passerà a Flux).
-- [ ] Ingress Traefik con host tipo `boutique-dev.localtest.me` (risolve a 127.0.0.1, nessuna modifica a `/etc/hosts`).
-- [ ] Verifica pod, service, endpoint e navigazione dello shop.
+- [x] `scripts/cluster-up.sh`: `k3d cluster create` con port-mapping `8080:80@loadbalancer`. _Port-mapping `${HOST_PORT}:80@loadbalancer`; eseguito 3 volte da cluster cancellato il 2026-11-24._
+- [x] Deploy della base upstream con `kubectl apply -k` come primo test (poi passerà a Flux). _Fatto in fase 2 e come `scripts/apply-local.sh` (ultima prova 2026-11-19); oggi il percorso normale è Flux._
+- [x] Ingress Traefik con host tipo `boutique-dev.localtest.me` (risolve a 127.0.0.1, nessuna modifica a `/etc/hosts`). _`boutique-dev.localtest.me` e `boutique-prod.localtest.me`; smoke test 7/7 in entrambi._
+- [x] Verifica pod, service, endpoint e navigazione dello shop. _Smoke test 7/7 il 2026-11-24, tre volte da cluster cancellato._
 
 **Done quando:** lo shop risponde su `http://boutique-dev.localtest.me:8080`.
 
 ### Fase 3 — Overlay, hardening e configurazione (M-L) — Sicurezza 7%
-- [ ] Overlay `dev` e `prod`: namespace, repliche, resources requests/limits, host ingress, tag immagini. Loadgenerator attivo solo in `dev`.
-- [ ] Service account: la base upstream ne definisce già uno per servizio (11, nessuno per `redis-cart`; non esiste un component dedicato). Imposta `automountServiceAccountToken: false` con una patch, e valuta un SA anche per Redis.
-- [ ] NetworkPolicy (component upstream) con default-deny. Verifica che il controller di k3s le applichi davvero.
-- [ ] `securityContext` (non-root, readOnlyRootFilesystem, drop capabilities) dove l'app lo consente; documenta le eccezioni.
-- [ ] Secret: l'app non ha secret reali, quindi crea un caso onesto (es. password Redis o credenziale di test) gestito con SOPS+age. Dichiara che è un caso costruito per la challenge.
-- [ ] Documenta i limiti residui (Redis senza persistenza, cluster unico, nessuna rotazione secret, ecc.).
+- [x] Overlay `dev` e `prod`: namespace, repliche, resources requests/limits, host ingress, tag immagini. Loadgenerator attivo solo in `dev`. _Verificato nel cluster il 2026-11-24: dev 12 Deployment a 1 replica con loadgenerator; prod 11 Deployment, frontend e catalogo a 2 repliche, nessun loadgenerator; `kustomize build` + `kubeconform` 0 invalidi (dev 50, prod 47 risorse valide)._
+- [x] Service account: la base upstream ne definisce già uno per servizio (11, nessuno per `redis-cart`; non esiste un component dedicato). Imposta `automountServiceAccountToken: false` con una patch, e valuta un SA anche per Redis. _Verificato il 2026-11-24: tutti i Deployment hanno un ServiceAccount dedicato (anche `redis-cart`) e `automountServiceAccountToken: false`; nessun permesso RBAC (vedi `docs/security.md` §1)._
+- [x] NetworkPolicy (component upstream) con default-deny. Verifica che il controller di k3s le applichi davvero. _Verificato il 2026-11-24: `deny-all` più una policy per servizio in dev e prod; `scripts/netpol-test.sh` positivo._
+- [x] `securityContext` (non-root, readOnlyRootFilesystem, drop capabilities) dove l'app lo consente; documenta le eccezioni. _Verificato il 2026-11-24 con uno script sui pod: 13 container in dev e 14 in prod, 0 scostamenti su risorse, rootfs in sola lettura, nessuna escalation, `drop: ALL`, non-root. Nessuna eccezione da documentare._
+- [x] Secret: l'app non ha secret reali, quindi crea un caso onesto (es. password Redis o credenziale di test) gestito con SOPS+age. Dichiara che è un caso costruito per la challenge. _`redis-auth.enc.yaml` in dev e prod, cifrato con SOPS+age; dichiarato come caso costruito nel README._
+- [x] Documenta i limiti residui (Redis senza persistenza, cluster unico, nessuna rotazione secret, ecc.). _`docs/security.md` §3; aggiunto il 2026-11-24 il limite su Flux `cluster-admin`._
 
 **Done quando:** `kustomize build` produce dev e prod diversi e validi, con policy attive.
 
@@ -116,7 +116,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
   - _Come sopra. Corretto un `status.Errorf` in checkoutservice che faceva fallire `go vet`._
 - [x] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
   - _Runner arm64 nativi disponibili sul fork pubblico; build di 11 servizi × 2 architetture passate sulla PR (senza push); push da provare. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
-- [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
+- [x] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
   - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: promosso il 2026-11-20 (`prod@7a723188`), 0 restart, smoke test ok (`docs/ci.md` §5)._
 - [x] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
   - _Commit automatico in `deploy/components/dev-images`: provato, Flux ha fatto il rollout in dev (12/12 pronti, smoke test ok)._
@@ -127,7 +127,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 
 ### Fase 7 — Stack di osservabilità (M) — Osservabilità 8%
 - [x] `HelmRelease` di kube-prometheus-stack gestito da Flux. _Installato; Grafana saturava la CPU (fino a 4,4 core, 121 riavvii). La PR #10 (senza dashboard predefinite, limite di CPU 1 core) non basta: dopo 25 minuti è tornato al limite quando è stata aperta la pagina delle metriche (circa 130 richieste POST in 2 minuti). A schede chiuse 18-130 mCPU. Causa non provata, correzione ulteriore da decidere (`docs/observability.md` §8)._
-- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy._
+- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy; **promosse il 2026-11-24 (PR #23), da allora `up`**._
 - [x] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis. _Query verificate con dati reali in dev; la pagina non è stata guardata._
 - [x] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile). _Quattro regole; con Redis spento in dev sono scattati `RedisDown` e `FrontendHigh5xxRate`. `FrontendUnavailable` e `PodCrashLooping` non esercitate._
 
@@ -167,8 +167,8 @@ Fase più pesante: dedicale tempo vero.
 
 ### Fase 11 — Prova generale della demo (S-M)
 - [x] `docs/demo-checklist.md` con i comandi in ordine e i tempi. _Fatta il 2026-11-24; il passo 7 (CI) e il rollback non sono stati rimisurati di seguito._
-- [ ] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte. _Fatte due prove il 2026-11-24 (circa 4 e 5 min fino allo shop funzionante, smoke test 7/7 in dev e prod). Restano aperte: nessuna delle due è «a demo finita» (passi 7 e 9 non rifatti), e la seconda ha avuto 3 riavvii a freddo per probe di liveness. Vedi `docs/demo-checklist.md`._
-- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`. _Provato solo che `k3d cluster stop/start` conserva le immagini (nessun pull dopo il riavvio); **non provato con la rete staccata** né `k3d image import`._
+- [x] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte. _Fatte tre prove il 2026-11-24 (circa 4, 5 e 5 min fino allo shop funzionante, smoke test 7/7 in dev e prod); la terza dopo la promozione a prod, con i 5 target Prometheus `up` e nessun riavvio. **Non sono «a demo finita»**: i passi 7 (CI) e 9 (rollback) non sono stati rifatti da zero in una sola prova (vedi «Demo completa» nella definition of done). Nella seconda prova 3 riavvii a freddo per probe di liveness. Vedi `docs/demo-checklist.md`._
+- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`. _Saltato su decisione dell'utente (2026-11-24): la prova con la rete staccata non verrà fatta e il piano resta **non provato**._ _Provato solo che `k3d cluster stop/start` conserva le immagini (nessun pull dopo il riavvio); **non provato con la rete staccata** né `k3d image import`._
 
 ## 3bis. Calendario (10 giorni)
 
@@ -225,8 +225,8 @@ Se sei in ritardo, taglia da Nice e Should, **mai dalla fase 8**.
 
 ## 7. Definition of done finale
 
-- [ ] Tutti i deliverable della sezione 8 della traccia presenti nel repo.
-- [ ] Demo completa eseguita da zero senza interventi non documentati.
-- [ ] `AI-LOG.md` e `docs/ai-usage.md` coerenti, con almeno un caso di troubleshooting.
-- [ ] Nessun secret in chiaro nel repo (storia git inclusa).
-- [ ] Ogni scelta spiegabile in 2 frasi con il relativo trade-off.
+- [x] Tutti i deliverable della sezione 8 della traccia presenti nel repo. _Controllati il 2026-11-24 contro `challenge-l2/Challenge_L2.pdf`: repository pubblico (fork); sezione «Perché Online Boutique» con link all'originale, dominio e parti usate (`l2-challenge/README.md`); README completo; Dockerfile (11, quello del frontend modificato da noi); manifest Kustomize (`deploy/`); workflow GitHub Actions (`.github/workflows/`); `docs/architecture.md` con diagramma Mermaid; `docs/runbook.md`; `docs/krateo-evaluation.md`; `l2-challenge/ai-usage.md` e `AI-LOG.md`; script in `scripts/`. Presenti non vuol dire provati: la prova da parte di un altro utente manca._
+- [ ] Demo completa eseguita da zero senza interventi non documentati. _Aperta: tre prove da cluster distrutto (2026-11-24) hanno coperto i passi 3-6 e 8; il passo 7 (CI) e il passo 9 (rollback, con ordine corretto) non sono stati rifatti da zero in una sola prova._
+- [x] `AI-LOG.md` e `l2-challenge/ai-usage.md` coerenti, con almeno un caso di troubleshooting. _Il file è `l2-challenge/ai-usage.md`, non `docs/`. Caso di troubleshooting: AI-17. Rilettura e correzione dei conteggi nella PR #25, unita il 2026-11-24._
+- [x] Nessun secret in chiaro nel repo (storia git inclusa). _`gitleaks git` il 2026-11-24 su 2827 commit: nessun rilievo (regole predefinite). Non copre segreti che nessuna regola riconosce._
+- [ ] Ogni scelta spiegabile in 2 frasi con il relativo trade-off. _Non verificabile da me: gli ADR 0001-0005 riportano scelte e alternative scartate; la prova è spiegarle a voce._

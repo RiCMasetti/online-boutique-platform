@@ -146,7 +146,7 @@ Blackbox exporter per il frontend (opzionale): **non fatto**. La build multi-arc
 
 ## 8. Stack di osservabilità (fase 7)
 
-**Stato (2026-11-20): installato da Flux e verificato in dev; prod in attesa della promozione delle NetworkPolicy (i suoi target sono `down`).** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
+**Stato (2026-11-24): installato da Flux e verificato in dev; i target di prod, `down` fino al 2026-11-20, sono `up` dalla promozione `main → prod` del 2026-11-24 (PR #23, `prod@c2af201e`, vedi §8).** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
 
 | Cosa | Dove |
 |---|---|
@@ -173,6 +173,7 @@ Blackbox exporter per il frontend (opzionale): **non fatto**. La build multi-arc
 
 - Il `HelmRelease` si è installato (`Helm install succeeded`, chart 93.6.0); `observability-stack` e `observability-config` applicate da Flux.
 - Target `up`: frontend e redis-cart in dev. In **prod** sono `down` (`connection refused`): le NetworkPolicy di prod non ammettono ancora Prometheus, perché arriveranno con la prossima promozione `main → prod`. Verificato che la causa è questa: le policy di prod non contengono il namespace `monitoring`, mentre quelle di dev sì, e il frontend di prod risponde 200 dall'Ingress. L'alert `TargetDown` per prod è `firing`, come deve.
+  **Aggiornamento 2026-11-24:** la promozione (PR #23) ha aggiunto le regole per Prometheus alle policy di prod; Flux le ha applicate circa 3 min 40 s dopo il merge (un solo caso misurato; il ritardo è l'intervallo del `GitRepository` del branch `prod`) e dopo circa 50 s tutti e 5 i target (frontend e redis-cart di dev, frontend ×2 e redis-cart di prod) sono `up`. Smoke test 7/7 in dev e prod, `scripts/netpol-test.sh boutique-prod` positivo, 12 pod `Running` con 0 riavvii e uno con 1 riavvio in prod. Alert `CPUThrottlingHigh` in `pending` sia in dev sia in prod: non indagato.
 - Le quattro regole sono caricate senza errori. Le 11 query della dashboard restituiscono dati reali per dev; Grafana ha caricato la dashboard `boutique-overview` e una query passata da Grafana al datasource `prometheus` risponde. **Non ho guardato la pagina disegnata.**
 - **Guasto provocato in dev** (Redis spento con `kubectl scale --replicas=0`, circa 7 minuti, poi ripristino): `RedisDown` in `pending` a +15 s, `firing` a +78 s; `FrontendHigh5xxRate` `pending` a +36 s, `firing` a +162 s; `/cart` 500 per tutta la durata; dopo il ripristino smoke test superato, nessun restart, i due alert rientrati entro 1-2 minuti. Non esercitati: `FrontendUnavailable`, `PodCrashLooping`, la ricezione degli alert in Alertmanager.
 
