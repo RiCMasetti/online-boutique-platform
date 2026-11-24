@@ -1,6 +1,6 @@
 # Osservabilità
 
-Stato a fine fase 5: il frontend espone metriche Prometheus. Prometheus, Grafana e gli alert arrivano in fase 7. Il resto della fase 5 è elencato in §6.
+Le sezioni 1-7 descrivono la fase 5 (metriche del frontend, immagine, Redis, log, probe). Prometheus, Grafana e gli alert della fase 7 sono nella sezione 8.
 
 ## 1. Metriche del frontend
 
@@ -140,6 +140,52 @@ Altre osservazioni, non corrette:
 - Il loadgenerator non ha probe (non espone porte).
 - Il frontend ha `timeoutSeconds: 1`: non ha dato problemi in circa 19 ore (0 riavvii), ma non l'ho messo sotto carico.
 
-## 8. Ancora da fare in fase 5
+### Rimasto dalla fase 5
 
-Blackbox exporter per il frontend (opzionale, non fatto). La build multi-arch degli altri servizi e la riverifica delle probe sono in fase 6.
+Blackbox exporter per il frontend (opzionale): **non fatto**. La build multi-arch degli altri servizi e la riverifica delle probe sono state fatte in fase 6 (docs/ci.md §4 e §5).
+
+## 8. Stack di osservabilità (fase 7)
+
+**Stato (2026-11-20): installato da Flux e verificato in dev; prod in attesa della promozione delle NetworkPolicy (i suoi target sono `down`).** Scelte e limiti in [ADR 0004](adr/0004-stack-di-osservabilita.md).
+
+| Cosa | Dove |
+|---|---|
+| kube-prometheus-stack 93.6.0 (HelmRelease) | `observability/stack/` |
+| ServiceMonitor frontend e redis-cart | `observability/config/servicemonitors.yaml` |
+| Alert | `observability/config/rules.yaml` |
+| Dashboard "Online Boutique: panoramica" | `observability/config/boutique.json` |
+| Kustomization Flux | `clusters/local/observability-stack.yaml`, `observability-config.yaml` |
+| NetworkPolicy per Prometheus | `deploy/components/network-policies/kustomization.yaml` |
+
+**Accesso**
+
+- Grafana: `http://grafana.localtest.me:8080`, utente `admin`. La password è nel Secret cifrato `observability/stack/grafana-admin.enc.yaml`: si legge con `sops -d` (serve la chiave privata age, che non è nel repository) oppure dal cluster con `kubectl -n monitoring get secret grafana-admin -o jsonpath='{.data.admin-password}' | base64 -d`.
+- Prometheus: `kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090`.
+- Alertmanager: `kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093`.
+
+**Alert** (dev e prod): `FrontendUnavailable` (nessuna replica pronta, 1 min), `PodCrashLooping` (CrashLoopBackOff, 2 min), `RedisDown` (`redis_up 0` oppure nessuna replica pronta, 1 min), `FrontendHigh5xxRate` (oltre il 5% di 5xx con almeno 0,2 richieste/s, 2 min). `FrontendUnavailable` e `RedisDown` usano kube-state-metrics e non `up`: se il pod sparisce la serie `up` scompare e `up == 0` non scatterebbe.
+
+**Test degli alert (eseguiti, senza cluster):** `observability/config/tests/rules_test.yaml` prova la logica delle quattro regole con `promtool test rules` su serie sintetiche (Redis giù con pod non pronto → un solo alert; Redis spento senza serie dell'exporter; Redis sano; frontend senza repliche; 5xx alti con e senza traffico; crash loop). Girano anche in CI. Verificato che i test possono fallire: con la vecchia espressione di `RedisDown` (senza aggregazione per namespace) scattavano due alert per un solo guasto. Non provano il cluster né che le metriche abbiano quelle etichette.
+
+**Limite noto degli alert:** se un Deployment viene cancellato, kube-state-metrics non emette più la serie `kube_deployment_status_replicas_available` e `FrontendUnavailable`/`RedisDown` non scattano (servirebbe un `absent()`). Flux ricrea l'oggetto al giro successivo.
+
+**Verificato nel cluster (dev)**
+
+- Il `HelmRelease` si è installato (`Helm install succeeded`, chart 93.6.0); `observability-stack` e `observability-config` applicate da Flux.
+- Target `up`: frontend e redis-cart in dev. In **prod** sono `down` (`connection refused`): le NetworkPolicy di prod non ammettono ancora Prometheus, perché arriveranno con la prossima promozione `main → prod`. Verificato che la causa è questa: le policy di prod non contengono il namespace `monitoring`, mentre quelle di dev sì, e il frontend di prod risponde 200 dall'Ingress. L'alert `TargetDown` per prod è `firing`, come deve.
+- Le quattro regole sono caricate senza errori. Le 11 query della dashboard restituiscono dati reali per dev; Grafana ha caricato la dashboard `boutique-overview` e una query passata da Grafana al datasource `prometheus` risponde. **Non ho guardato la pagina disegnata.**
+- **Guasto provocato in dev** (Redis spento con `kubectl scale --replicas=0`, circa 7 minuti, poi ripristino): `RedisDown` in `pending` a +15 s, `firing` a +78 s; `FrontendHigh5xxRate` `pending` a +36 s, `firing` a +162 s; `/cart` 500 per tutta la durata; dopo il ripristino smoke test superato, nessun restart, i due alert rientrati entro 1-2 minuti. Non esercitati: `FrontendUnavailable`, `PodCrashLooping`, la ricezione degli alert in Alertmanager.
+
+**Problema trovato: Grafana saturava la CPU all'avvio.** Misurato su Prometheus (`container_cpu_usage_seconds_total`): per circa 15 minuti dopo l'installazione Grafana ha usato da 1,2 a 4,8 core (picco 4,77 alle 16:19) su 6, cioè circa il 95% della CPU di tutto il cluster, finché la probe di liveness (`/api/health`) non è fallita e il kubelet l'ha riavviato (exit 137, `Container grafana failed liveness probe`; **non** un OOMKill: nessun container del cluster risulta `OOMKilled`). Il primo riavvio, all'avvio, era un timeout (exit 1). Memoria al picco: 353 MiB su un limite di 384 (92%). Nei log dell'istanza uccisa: `Handler timeout` dell'apiserver interno di Grafana e `context canceled`. Dopo il primo riavvio Grafana è sembrato calmo (0,2-0,7 core), ma **era una conclusione affrettata**: il 23 novembre, a distanza di circa tre giorni, lo stesso pod aveva 121 riavvii e usava 4,4 core (281 MiB, sotto il limite di 384: il problema era la CPU, non la memoria), con il nodo all'86% e probe in timeout anche su operator, alertmanager e kube-state-metrics.
+
+*Causa: non provata; l'ipotesi iniziale è debole.* Il primo sospetto era l'importazione di venti ConfigMap di dashboard predefinite da parte del sidecar. Non ho fatto la prova decisiva (riavviare Grafana con meno dashboard e misurare) e la verifica dopo il merge (qui sotto) indica un'altra spiegazione più probabile: il carico di query lanciate dal browser. Correzione applicata: dashboard predefinite del chart disattivate (resta solo la nostra), limite di CPU di 1 core, memoria 512Mi.
+
+**Verifica dopo il merge (PR #10, 23 novembre): il fix non ha retto.** Flux ha applicato `main@649735c2` (`Helm upgrade succeeded`, release v2). Sul pod in esecuzione i limiti sono quelli attesi (CPU 1, memoria 512Mi) e nel cluster resta una sola ConfigMap con l'etichetta `grafana_dashboard`. Per circa 5 minuti il pod è stato calmo (56-250 mCPU, 0 riavvii), e l'ho dichiarato «ok» troppo presto. Dopo circa 25 minuti Grafana era di nuovo al limite: 999 mCPU, il 47% del tempo di CPU in throttling, pod `2/3` con la readiness in timeout.
+
+Dai log di quel momento: 131 richieste `POST /api/ds/query` in 2 minuti, su un'ora 350 richieste concluse con status 499 (annullate dal client dopo 60-78 secondi), con referer `/dashboards` e soprattutto l'app **Metrics Drilldown** di Grafana (che interroga ogni metrica di Prometheus); solo 36 richieste venivano dalla nostra dashboard `boutique-overview`. Chi usa Grafana ha riferito di aver aperto la pagina delle metriche, e che il volume di POST aveva saturato la CPU. Chiuse le schede, in circa 2 minuti la CPU è scesa a 18-130 mCPU, il pod è tornato `3/3` e le richieste a 0.
+
+**Cosa è dimostrato e cosa no.** Dimostrato: a Grafana senza pagine aperte la CPU è bassa, con la pagina delle metriche aperta il pod arriva al limite di CPU e non risponde alle probe (correlazione osservata una volta, non un test controllato). **Non dimostrato:** quale pagina o quale query sia la causa precisa (non ho riaperto le pagine una alla volta: si è scelto di non farlo); se questo spieghi anche l'incidente del 20 novembre e i tre giorni a 4,4 core del pod precedente, per i quali non so cosa fosse aperto nel browser; se le venti dashboard predefinite abbiano contribuito. Con un limite di 1 core e probe di 1 secondo, Grafana smette di rispondere alla readiness appena le query si accumulano.
+
+**Non fatto, da decidere:** disattivare l'app Metrics Drilldown, alzare il limite di CPU o allungare le probe di Grafana, chiudere le schede quando non servono. Nessuna di queste modifiche è nella PR #10.
+
+**Conseguenza sul test del guasto:** la prova del guasto è avvenuta mentre Grafana consumava fino a circa 4,8 core. Gli alert sono scattati comunque, ma i tempi misurati possono includere ritardi di raccolta e valutazione dovuti al nodo occupato: vanno letti come limite superiore. L'alert di default `CPUThrottlingHigh` per dev era `pending` in quel periodo; non l'ho indagato.

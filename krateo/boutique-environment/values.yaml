@@ -1,0 +1,37 @@
+# Parametri del golden path. Ogni chiave qui è un campo di `spec` della Composition
+# (Krateo genera la CRD da values.schema.json: vedi docs/krateo-evaluation.md §3).
+
+# Nome dell'ambiente: diventa nome degli oggetti Flux e, di default, del namespace.
+# Massimo 30 caratteri: gli oggetti Flux prendono il prefisso "boutique-" e il namespace
+# di default lo stesso. (Il nome della Composition ha un limite suo di 44 caratteri: Krateo
+# aggiunge un suffisso UID di 9 al nome della release Helm.)
+name: demo
+
+# Namespace Kubernetes dell'ambiente. Vuoto = "boutique-<name>".
+namespace: ""
+
+# Selettore dell'overlay: "dev" = una replica per servizio + loadgenerator, "prod" = senza loadgenerator.
+environment: dev
+
+# Chi risponde dell'ambiente (etichetta e ownership). Obbligatorio nello schema, nessun default utile.
+owner: team-platform
+
+# Classe di servizio: decide le repliche dei servizi sul percorso utente.
+# best-effort: 1 replica, standard: 1 replica, critical: 2 repliche (frontend, productcatalogservice).
+tier: standard
+
+# Host dell'Ingress. Vuoto = "boutique-<name>.localtest.me" (risolve a 127.0.0.1, nessun /etc/hosts).
+ingressHost: ""
+
+# Risorse del frontend (unico servizio con limiti esposti: gli altri restano quelli della base).
+frontend:
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+# Sorgente Git dell'ambiente.
+repository:
+  url: ssh://git@github.com/RiCMasetti/online-boutique-platform
+  branch: main
+  # Secret con la deploy key SSH, nello stesso namespace degli oggetti Flux (flux-system).
+  secretName: flux-system

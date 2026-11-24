@@ -1,0 +1,50 @@
+# L'ambiente vero e proprio: Flux applica l'overlay indicato, con i parametri di Krateo
+# passati come sostituzioni e patch. Krateo possiede QUESTO oggetto; Flux possiede ciò che crea.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: boutique-{{ .Values.name }}
+  namespace: flux-system
+  labels:
+    {{- include "boutique-environment.labels" . | nindent 4 }}
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 5m
+  path: ./deploy/overlays/environment-{{ .Values.environment }}
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: boutique-{{ .Values.name }}
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age
+  postBuild:
+    substitute:
+      namespace: {{ include "boutique-environment.namespace" . | quote }}
+      ingress_host: {{ include "boutique-environment.host" . | quote }}
+      owner: {{ .Values.owner | quote }}
+      tier: {{ .Values.tier | quote }}
+  patches:
+    - target:
+        kind: Deployment
+        name: frontend
+      patch: |-
+        - op: add
+          path: /spec/replicas
+          value: {{ include "boutique-environment.replicas" . }}
+        - op: replace
+          path: /spec/template/spec/containers/0/resources/limits/cpu
+          value: {{ .Values.frontend.limits.cpu | quote }}
+        - op: replace
+          path: /spec/template/spec/containers/0/resources/limits/memory
+          value: {{ .Values.frontend.limits.memory | quote }}
+    - target:
+        kind: Deployment
+        name: productcatalogservice
+      patch: |-
+        - op: add
+          path: /spec/replicas
+          value: {{ include "boutique-environment.replicas" . }}

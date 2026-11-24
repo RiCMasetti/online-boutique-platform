@@ -1,6 +1,6 @@
 # Architettura di Online Boutique
 
-Analisi dell'applicazione (fase 1). Tutto ciò che è scritto qui deriva dalla **lettura statica** di manifest (`kustomize/base`, `kustomize/components/network-policies`), `protos/demo.proto` e codice in `src/`, riferita al commit `81b1c6c7`. Nulla è stato ancora osservato a runtime: i punti che richiedono una prova nel cluster sono raccolti in [Da verificare a runtime](#da-verificare-a-runtime).
+Analisi dell'applicazione (fase 1). Tutto ciò che è scritto qui deriva dalla **lettura statica** di manifest (`kustomize/base`, `kustomize/components/network-policies`), `protos/demo.proto` e codice in `src/`, riferita al commit `81b1c6c7`. Le sezioni 1-7 restano lettura statica. Ciò che è stato poi osservato nel cluster sta nelle sezioni [8](#8-da-verificare-a-runtime) (con lo stato di ogni punto) e [10](#10-osservazioni-dal-primo-deploy-fase-2).
 
 ## 1. Panoramica
 
@@ -193,9 +193,9 @@ Conseguenza per la fase 3: le policy upstream limitano il traffico **in ingresso
 Cose dedotte dal codice. Quelle spuntate sono state osservate nel cluster k3d (fase 2, 2026-11-19); le altre restano da provare.
 
 - [x] Il frontend risulta `Ready` con backend assenti: è rimasto `1/1` per oltre 10 minuti mentre email, recommendation e altri erano in `CrashLoopBackOff` o non pronti.
-- [ ] Variabile `*_SERVICE_ADDR` sbagliata: nessun crash, errori 500 e log gRPC. Variabile rimossa: `CrashLoopBackOff` (frontend e checkout). _Fase 8._
-- [ ] Con Redis fermo, il cartservice resta `Ready` e le chiamate falliscono con `FailedPrecondition`. _Fase 8._
-- [ ] Le NetworkPolicy upstream sono applicate da k3s: un pod non autorizzato non raggiunge il servizio protetto. _Fase 3._
+- [x] Variabile `*_SERVICE_ADDR` sbagliata: nessun crash, errori 500 e log gRPC. Variabile rimossa: `CrashLoopBackOff`. _Provato in fase 8 con `scripts/break-it.sh` (2026-11-23): valore sbagliato sul frontend → pod `Ready` ed errori 500; variabile rimossa dal checkoutservice → `CrashLoopBackOff`. La variabile rimossa dal frontend non è stata provata._
+- [ ] Con Redis fermo, il cartservice resta `Ready` e le chiamate falliscono con `FailedPrecondition`. _Provato in parte (fase 5, docs/observability.md §7): la home dà 500 e il cartservice va in timeout sulla probe e torna `Ready` a Redis ancora spento; il codice di errore `FailedPrecondition` non è stato verificato._
+- [x] Le NetworkPolicy upstream sono applicate da k3s: un pod non autorizzato non raggiunge il servizio protetto. _Provato in fase 3 con `scripts/netpol-test.sh` in dev e prod, anche con controlli negativi (docs/security.md §1)._
 - [x] Formato dei log: JSON in 9 servizi su 11 (frontend, checkout, productcatalog, shipping, currency, payment, email, recommendation, ad). **Non JSON:** cartservice (testo semplice, es. `GetCartAsync called with userId=...`) e loadgenerator.
 - [x] Consumo reale: vedi [sezione 10](#10-osservazioni-dal-primo-deploy-fase-2).
 

@@ -45,7 +45,7 @@ Perché un branch e non un tag: Flux sceglie i tag solo con un intervallo semver
 ## 4. Rollback e modifiche manuali
 
 - **Rollback corretto:** `git revert <commit>` e push su `main` (o PR su `prod`). Flux riconcilia e riporta lo stato precedente. Provato in dev: il revert di un cambio di repliche ha riportato il Deployment al valore precedente in circa un minuto.
-- **`kubectl rollout undo` / `kubectl scale`:** non sono permanenti. Alla prossima riconciliazione (al più 10 minuti, o subito con un nuovo commit) Flux riporta l'oggetto a ciò che dice Git. *Non ancora provato*: è atteso dal modello di Flux, lo si verifica nella fase 8. Per un intervento manuale temporaneo serve `flux suspend kustomization <nome>` e poi `flux resume`.
+- **`kubectl rollout undo` / `kubectl scale`:** non sono permanenti. Alla prossima riconciliazione (al più 10 minuti, o subito con un nuovo commit) Flux riporta l'oggetto a ciò che dice Git. Provato il 2026-11-24 in dev: Flux l'ha annullato dopo 10 min 20 s, e nel frattempo la Kustomization risultava `Ready` (misure e ordine corretto del ripristino in docs/runbook.md §4). Per un intervento manuale temporaneo serve `flux suspend kustomization <nome>` e poi `flux resume`.
 
 ## 5. Comandi utili
 
@@ -71,4 +71,4 @@ Usa sempre `--context k3d-boutique`: sulla macchina esistono altri contesti Kube
 | `git revert` dello stesso commit | torna a 1 replica in circa 55 s |
 | `scripts/flux-bootstrap.sh` rieseguito sul cluster esistente | nessuna modifica, tutto sano |
 
-**Non provato:** il bootstrap su un cluster nuovo (`k3d cluster delete` e ripartenza da zero); il drift da modifica manuale; il tempo che Flux impiega ad applicare un merge su `prod` (osservato solo lo stato finale). La PR #1 `main → prod` è stata unita e la Kustomization `boutique-prod` risultava `Ready` su `prod@88fec121` il 2026-11-20, quindi il meccanismo funziona; la seconda promozione (immagini GHCR, senza workaround arm64) è descritta in [docs/ci.md](ci.md) §5.
+**Provato il 2026-11-23:** il bootstrap su un cluster nuovo (`k3d cluster delete`, `cluster-up.sh`, `flux-bootstrap.sh`): `infrastructure` e `flux-system` `Ready` subito, le altre quattro Kustomization (`observability-stack`, `observability-config`, `boutique-dev`, `boutique-prod`) in circa 3 minuti, senza interventi; l'ordine `dependsOn` ha tenuto (dev e osservabilità `False` con «dependency … is not ready» finché l'infrastruttura non era pronta). **Non provato:** il drift da modifica manuale; il tempo che Flux impiega ad applicare un merge su `prod` (osservato solo lo stato finale). La PR #1 `main → prod` è stata unita e la Kustomization `boutique-prod` risultava `Ready` su `prod@88fec121` il 2026-11-20, quindi il meccanismo funziona; la seconda promozione (immagini GHCR, senza workaround arm64) è stata eseguita lo stesso giorno (`prod@7a723188`, esito in [docs/ci.md](ci.md) §5).

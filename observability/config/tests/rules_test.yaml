@@ -1,0 +1,117 @@
+# Test unitari degli alert con `promtool test rules` su serie sintetiche (fase 7).
+# `rules.generated.yaml` si ricava da ../rules.yaml: vedi docs/observability.md §8 e il job
+# `manifests` della CI. Non provano il cluster: provano la logica delle espressioni.
+rule_files:
+  - rules.generated.yaml
+evaluation_interval: 15s
+
+tests:
+  # Redis cade e il pod diventa non pronto: redis_up 0 E nessuna replica pronta, insieme.
+  # Deve scattare UN solo alert per namespace (le due condizioni si fondono).
+  - name: redis giù con pod non pronto, un solo alert
+    interval: 15s
+    input_series:
+      - series: 'redis_up{namespace="boutique-dev",pod="redis-cart-a",job="redis-cart"}'
+        values: '0x20'
+      - series: 'kube_deployment_status_replicas_available{namespace="boutique-dev",deployment="redis-cart"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels:
+              namespace: boutique-dev
+              severity: critical
+            exp_annotations:
+              summary: "Redis (carrello) non disponibile in boutique-dev"
+              description: "Il carrello non funziona: il frontend risponde con errori 5xx alle pagine che lo usano."
+
+  # Pod spento (scale a 0): non esiste più nessuna serie redis_up, resta solo kube-state-metrics.
+  - name: redis spento, nessuna serie dell'exporter
+    interval: 15s
+    input_series:
+      - series: 'kube_deployment_status_replicas_available{namespace="boutique-prod",deployment="redis-cart"}'
+        values: '0x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RedisDown
+        exp_alerts:
+          - exp_labels:
+              namespace: boutique-prod
+              severity: critical
+            exp_annotations:
+              summary: "Redis (carrello) non disponibile in boutique-prod"
+              description: "Il carrello non funziona: il frontend risponde con errori 5xx alle pagine che lo usano."
+
+  # Redis sano: nessun alert.
+  - name: redis sano
+    interval: 15s
+    input_series:
+      - series: 'redis_up{namespace="boutique-dev",pod="redis-cart-a",job="redis-cart"}'
+        values: '1x20'
+      - series: 'kube_deployment_status_replicas_available{namespace="boutique-dev",deployment="redis-cart"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RedisDown
+        exp_alerts: []
+
+  - name: frontend senza repliche pronte
+    interval: 15s
+    input_series:
+      - series: 'kube_deployment_status_replicas_available{namespace="boutique-dev",deployment="frontend"}'
+        values: '2 2 2 0x20'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: FrontendUnavailable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: FrontendUnavailable
+        exp_alerts:
+          - exp_labels:
+              namespace: boutique-dev
+              deployment: frontend
+              severity: critical
+            exp_annotations:
+              summary: "Frontend non disponibile in boutique-dev"
+              description: "Nessuna replica pronta del Deployment frontend da oltre un minuto."
+
+  # 1 richiesta/s, metà in errore: scatta. Traffico minimo (0,05/s) tutto in errore: non scatta.
+  - name: 5xx alti con traffico, non senza
+    interval: 15s
+    input_series:
+      - series: 'frontend_http_requests_total{namespace="boutique-dev",route="/",code="200"}'
+        values: '0+7.5x40'
+      - series: 'frontend_http_requests_total{namespace="boutique-dev",route="/",code="500"}'
+        values: '0+7.5x40'
+      - series: 'frontend_http_requests_total{namespace="boutique-prod",route="/",code="500"}'
+        values: '0+0.75x40'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: FrontendHigh5xxRate
+        exp_alerts:
+          - exp_labels:
+              namespace: boutique-dev
+              severity: warning
+            exp_annotations:
+              summary: "Più del 5% di errori 5xx dal frontend in boutique-dev"
+              description: "Quota di risposte 5xx negli ultimi due minuti: 50%."
+
+  - name: crash loop
+    interval: 15s
+    input_series:
+      - series: 'kube_pod_container_status_waiting_reason{namespace="boutique-dev",pod="cartservice-x",container="server",reason="CrashLoopBackOff"}'
+        values: '0 0 1x30'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: PodCrashLooping
+        exp_alerts:
+          - exp_labels:
+              namespace: boutique-dev
+              pod: cartservice-x
+              container: server
+              reason: CrashLoopBackOff
+              severity: critical
+            exp_annotations:
+              summary: "cartservice-x in crash loop in boutique-dev"
+              description: "Il container server è in CrashLoopBackOff da oltre due minuti."

@@ -1,0 +1,24 @@
+# Stack di osservabilità (HelmRelease). Dipende solo da `infrastructure` (namespace
+# monitoring), non da dev e prod, e dev e prod non dipendono da lui: un'installazione lenta
+# o fallita dello stack non deve bloccare il rollout dell'applicazione.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: observability-stack
+  namespace: flux-system
+spec:
+  interval: 10m
+  retryInterval: 1m
+  timeout: 15m
+  dependsOn:
+    - name: infrastructure
+  path: ./observability/stack
+  prune: true
+  wait: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age   # creato da scripts/flux-bootstrap.sh, mai committato

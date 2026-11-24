@@ -1,0 +1,9 @@
+# Stack di osservabilità: kube-prometheus-stack gestito da Flux (fase 7, ADR 0004).
+# La configurazione specifica del progetto (ServiceMonitor, regole, dashboard) sta in
+# ../config e si applica dopo che lo stack è pronto (servono i suoi CRD).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - helmrepository.yaml
+  - helmrelease.yaml
+  - grafana-admin.enc.yaml   # Secret cifrato con SOPS: password dell'utente admin di Grafana

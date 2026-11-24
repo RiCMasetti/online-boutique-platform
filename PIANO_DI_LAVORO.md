@@ -19,12 +19,15 @@ Ogni decisione va riportata in `docs/adr/` con data, contesto e trade-off.
 
 ```
 .
-├── README.md                    # prerequisiti, build, deploy, test, demo, motivazione scelta app
+├── README.md                    # rimando a l2-challenge/ e attribuzione a upstream
+├── l2-challenge/
+│   ├── README.md                # prerequisiti, build, deploy, test, demo, motivazione scelta app
+│   ├── ai-usage.md              # uso AI (vedi AI-LOG.md)
+│   └── consistency-check.md     # controllo di coerenza dei documenti
 ├── docs/
 │   ├── architecture.md          # componenti, flussi gRPC/HTTP, diagramma
 │   ├── runbook.md               # verifica, troubleshooting, rollback
 │   ├── krateo-evaluation.md     # valutazione + disegno di integrazione
-│   ├── ai-usage.md              # uso AI (vedi AI-LOG.md)
 │   ├── demo-checklist.md
 │   └── adr/
 ├── AI-LOG.md                    # diario vivo di prompt/output/verifiche (da giorno 1)
@@ -114,7 +117,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 - [x] Build e push su GHCR con tag = SHA, **per tutti gli 11 servizi** (matrice) e per `amd64` e `arm64` (ADR 0002). Verifica: runner arm64 disponibili per il fork pubblico? Pacchetti impostati come pubblici?
   - _Runner arm64 nativi disponibili sul fork pubblico; build di 11 servizi × 2 architetture passate sulla PR (senza push); push da provare. I pacchetti vanno resi pubblici a mano dopo la prima push (`docs/ci.md` §3)._
 - [ ] Passare gli overlay alle immagini GHCR e **rimuovere i workaround** di `deploy/overlays/dev` (probe rilassate, limiti di memoria).
-  - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: PR di promozione preparata (immagini GHCR, workaround tolto), da unire e verificare (`docs/ci.md` §5)._
+  - _Dev: fatto e verificato (immagini GHCR, workaround tolto, 0 restart con il loadgenerator). Prod: promosso il 2026-11-20 (`prod@7a723188`), 0 restart, smoke test ok (`docs/ci.md` §5)._
 - [x] Aggiornamento del tag nell'overlay `dev` (commit automatico o PR) in modo che Flux faccia il rollout.
   - _Commit automatico in `deploy/components/dev-images`: provato, Flux ha fatto il rollout in dev (12/12 pronti, smoke test ok)._
 - [x] Scansione immagine (Trivy) come plus, non bloccante.
@@ -123,47 +126,49 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 **Done quando:** una PR fa girare i controlli; il merge produce un'immagine e un rollout in `dev`.
 
 ### Fase 7 — Stack di osservabilità (M) — Osservabilità 8%
-- [ ] `HelmRelease` di kube-prometheus-stack gestito da Flux.
-- [ ] `ServiceMonitor` per frontend e Redis exporter.
-- [ ] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis.
-- [ ] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile).
+- [x] `HelmRelease` di kube-prometheus-stack gestito da Flux. _Installato; Grafana saturava la CPU (fino a 4,4 core, 121 riavvii). La PR #10 (senza dashboard predefinite, limite di CPU 1 core) non basta: dopo 25 minuti è tornato al limite quando è stata aperta la pagina delle metriche (circa 130 richieste POST in 2 minuti). A schede chiuse 18-130 mCPU. Causa non provata, correzione ulteriore da decidere (`docs/observability.md` §8)._
+- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy._
+- [x] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis. _Query verificate con dati reali in dev; la pagina non è stata guardata._
+- [x] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile). _Quattro regole; con Redis spento in dev sono scattati `RedisDown` e `FrontendHigh5xxRate`. `FrontendUnavailable` e `PodCrashLooping` non esercitate._
 
 **Done quando:** dashboard leggibile e almeno un alert che scatta nello scenario di failure.
 
 ### Fase 8 — Failure scenario, runbook, rollback (L) — Troubleshooting 20%
 Fase più pesante: dedicale tempo vero.
-- [ ] `scripts/break-it.sh` con almeno 3 guasti riproducibili:
+- [x] `scripts/break-it.sh` con almeno 3 guasti riproducibili. _Cinque scenari (`image-tag`, `bad-addr`, `missing-addr`, `low-memory`, `frontend-down`) più `restore` e `status`; tutti eseguiti in dev, ripristino 6-21 s. Il test con NetworkPolicy (opzionale) non è stato fatto._
   1. Tag immagine inesistente → `ImagePullBackOff`.
   2. Variabile `*_SERVICE_ADDR`: **sbagliata** (valore non vuoto) → pod sani ma errori gRPC/500 a ogni richiesta; **rimossa o vuota** → `CrashLoopBackOff` (es. checkout o frontend). Dal codice i client gRPC sono lazy (`grpc.NewClient`), quindi il crash loop non si ottiene con un valore sbagliato. Vedi `docs/architecture.md` §4; da confermare a runtime.
   3. Limite memoria troppo basso → `OOMKilled`.
   - (opzionale) NetworkPolicy troppo restrittiva → timeout tra servizi.
-- [ ] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica.
-- [ ] **Caso AI di troubleshooting** (obbligatorio): incolla (senza secret) eventi e log, registra prompt, ipotesi dell'AI, cosa hai verificato, cosa era sbagliato o incompleto.
-- [ ] Rollback GitOps: `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
-- [ ] `docs/runbook.md`: checklist di verifica, albero di diagnosi, rollback, criteri di escalation.
+- [x] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica. _In `docs/runbook.md` §3. Tempi di diagnosi non misurati in modo onesto: i guasti erano scelti da me._
+- [x] **Caso AI di troubleshooting** (obbligatorio; _AI-17: l'incidente reale di Grafana del 23 novembre, non un guasto costruito_): incolla (senza secret) eventi e log, registra prompt, ipotesi dell'AI, cosa hai verificato, cosa era sbagliato o incompleto.
+- [x] Rollback GitOps (_provato in dev il 2026-11-24, PR #19/#20, misure in `docs/runbook.md` §4; prod non provato_): `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
+- [x] `docs/runbook.md`: checklist di verifica, albero di diagnosi, rollback, criteri di escalation.
 
 **Done quando:** puoi rompere e riparare ogni scenario in meno di 5 minuti, spiegando la diagnosi.
 
 ### Fase 9 — Valutazione Krateo (M) — Krateo 5%
-- [ ] Studia la documentazione corrente di Krateo (non fidarti della memoria o dell'AI: verifica).
-- [ ] Individua il golden path: "nuovo ambiente Boutique" come template.
-- [ ] Parametri da esporre: nome servizio, namespace, ambiente, risorse, ingress host, repository, owner, tier.
-- [ ] Chiarisci cosa Krateo orchestra (risorse K8s, pipeline, DB) e cosa resta a Flux.
-- [ ] Benefici, prerequisiti, limiti, rischi; distingui **PoC / blueprint / adozione reale**.
-- [ ] Artefatto: diagramma di integrazione + YAML concettuale (chart wrapper per la composition). PoC solo se avanza tempo.
-- [ ] Il chart wrapper deve avere un `values.schema.json` nella root: la doc di Krateo lo indica come prerequisito di una `CompositionDefinition` (fonte in AI-LOG, AI-01). Lo schema coincide con i parametri esposti nel golden path. Rileggi la pagina direttamente, il controllo fatto finora è solo un riassunto.
-- [ ] Raccomandazione argomentata: se, quando e come adottarlo.
+- [x] Studia la documentazione corrente di Krateo (non fidarti della memoria o dell'AI: verifica). _Lette per intero 19 pagine di docs.krateo.io 3.0.0 (elenco in `docs/krateo-evaluation.md` §2); non lette: FinOps, Kserve, autenticazione, widget, migrazioni, `krateoctl`. Incoerenze della doc segnalate (rc1, 1.30 vs 1.31, solo Argo CD negli esempi)._
+- [x] Individua il golden path: "nuovo ambiente Boutique" come template.
+- [x] Parametri da esporre: nome servizio, namespace, ambiente, risorse, ingress host, repository, owner, tier.
+- [x] Chiarisci cosa Krateo orchestra (risorse K8s, pipeline, DB) e cosa resta a Flux.
+- [x] Benefici, prerequisiti, limiti, rischi; distingui **PoC / blueprint / adozione reale**.
+- [x] Artefatto: diagramma di integrazione + YAML concettuale (chart wrapper per la composition). PoC solo se avanza tempo. _Blueprint in `krateo/` e diagramma in `docs/krateo-evaluation.md` §3.3; controlli statici passati (lint, schema, kubeconform, patch su overlay prod). **PoC non fatto** (il cluster ha 6 CPU/9,7 GiB, la doc chiede 12 vCPU/16 GiB) e **overlay parametrico non creato**._
+- [x] Il chart wrapper deve avere un `values.schema.json` nella root: la doc di Krateo lo indica come prerequisito di una `CompositionDefinition` (fonte in AI-LOG, AI-01). Lo schema coincide con i parametri esposti nel golden path. Rileggi la pagina direttamente, il controllo fatto finora è solo un riassunto. _Riletta il 2026-11-23 (HTML scaricato e convertito, testo integrale): conferma `values.schema.json` come prerequisito; lo schema genera la CRD._
+- [x] Raccomandazione argomentata: se, quando e come adottarlo. _Non adottare ora; ADR 0005. Poggia su un'assenza di prove (compatibilità Krateo + Flux non provata)._
+
+**Done quando (dedotto dagli item):** raccomandazione scritta con distinzione PoC/blueprint/adozione. Raggiunto come blueprint; il PoC non c'è.
 
 ### Fase 10 — Documentazione finale e sezione AI (M)
-- [ ] README completo (prerequisiti, build, deploy, test, demo) **provato da zero su un cluster pulito**.
-- [ ] Sezione "Perché Online Boutique" con link, dominio e parti usate.
-- [ ] `docs/ai-usage.md`: cinque aree richieste dalla traccia (analisi, implementazione, operations, documentazione/demo, governance), con limiti e valore.
-- [ ] Controllo di coerenza: nessun comando nei doc che non hai eseguito.
+- [ ] README completo (prerequisiti, build, deploy, test, demo) **provato da zero su un cluster pulito**. _Scritto in `l2-challenge/README.md` (README della radice ridotto a un rimando). **Prova da zero con Flux fatta il 2026-11-23** (cluster cancellato e ricreato, 6 Kustomization `Ready` in circa 3 minuti, smoke test 7/7 in dev e prod). Percorso di un altro utente (chiave age, fork, GHCR) **non provato**: per questo l'item resta aperto._
+- [x] Sezione "Perché Online Boutique" con link, dominio e parti usate. _In `l2-challenge/README.md`._
+- [x] `ai-usage.md`: cinque aree richieste dalla traccia (analisi, implementazione, operations, documentazione/demo, governance), con limiti e valore. _In `l2-challenge/ai-usage.md`, non in `docs/`. Non riletto da me: da rivedere._
+- [x] Controllo di coerenza: nessun comando nei doc che non hai eseguito. _`l2-challenge/consistency-check.md`: sette incoerenze corrette, cinque no. **I documenti upstream (`docs/development-guide.md` e simili) hanno comandi non eseguiti**; tolti o no, da decidere._
 
 ### Fase 11 — Prova generale della demo (S-M)
-- [ ] `docs/demo-checklist.md` con i comandi in ordine e i tempi.
-- [ ] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte.
-- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`.
+- [x] `docs/demo-checklist.md` con i comandi in ordine e i tempi. _Fatta il 2026-11-24; il passo 7 (CI) e il rollback non sono stati rimisurati di seguito._
+- [ ] Prova completa da cluster distrutto (`k3d cluster delete`) a demo finita, almeno due volte. _Fatte due prove il 2026-11-24 (circa 4 e 5 min fino allo shop funzionante, smoke test 7/7 in dev e prod). Restano aperte: nessuna delle due è «a demo finita» (passi 7 e 9 non rifatti), e la seconda ha avuto 3 riavvii a freddo per probe di liveness. Vedi `docs/demo-checklist.md`._
+- [ ] Piano B per rete assente: immagini pre-scaricate, registro locale o `k3d image import`. _Provato solo che `k3d cluster stop/start` conserva le immagini (nessun pull dopo il riavvio); **non provato con la rete staccata** né `k3d image import`._
 
 ## 3bis. Calendario (10 giorni)
 

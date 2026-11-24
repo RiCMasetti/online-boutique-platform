@@ -59,7 +59,7 @@ Dichiarati apertamente: non sono difetti nascosti, ma confini di ciò che è sta
 **Rete**
 - **L'uscita non è limitata.** Le policy upstream hanno `egress: [{}]`: un pod compromesso può contattare qualunque destinazione. Le policy restringono solo l'ingresso.
 - Il traffico gRPC interno è in chiaro (nessun mTLS, nessun service mesh).
-- Quando arriveranno Prometheus e gli exporter (fasi 5-7) servirà aprire l'ingresso verso `frontend:8080` e verso gli exporter: va aggiornata la policy.
+- L'ingresso di Prometheus verso `frontend:8080` e verso gli exporter è stato aperto in fase 7 (`deploy/components/network-policies`). In prod arriva con la promozione `main → prod`: finché non avviene, i target di prod risultano `down` (docs/observability.md §8).
 
 **Secret e Redis**
 - Redis è una sola replica, senza TLS e senza persistenza (`emptyDir`): i carrelli si perdono al ricreare del pod.

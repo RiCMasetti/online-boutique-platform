@@ -7,8 +7,8 @@ components:
   - ../../../kustomize/components/network-policies
 patches:
   # Upstream il frontend accetta traffico da qualunque origine (`ingress: [{}]`).
-  # Lo limitiamo a Traefik (ingress controller di k3s) e al loadgenerator.
-  # Quando arriverà Prometheus servirà aggiungere il suo namespace (fase 5-7).
+  # Lo limitiamo a Traefik (ingress controller di k3s), al loadgenerator e a Prometheus
+  # (namespace monitoring, fase 7), che raccoglie /metrics sulla stessa porta 8080.
   - target:
       kind: NetworkPolicy
       name: frontend
@@ -26,6 +26,31 @@ patches:
               - podSelector:
                   matchLabels:
                     app: loadgenerator
+              - namespaceSelector:
+                  matchLabels:
+                    kubernetes.io/metadata.name: monitoring
+                podSelector:
+                  matchLabels:
+                    app.kubernetes.io/name: prometheus
             ports:
               - port: 8080
                 protocol: TCP
+  # redis-cart: upstream ammette solo il cartservice sulla 6379. Si aggiunge Prometheus sulla
+  # 9121, la porta del sidecar redis_exporter (fase 5). Gli altri servizi restano esclusi.
+  - target:
+      kind: NetworkPolicy
+      name: redis-cart
+    patch: |-
+      - op: add
+        path: /spec/ingress/-
+        value:
+          from:
+            - namespaceSelector:
+                matchLabels:
+                  kubernetes.io/metadata.name: monitoring
+              podSelector:
+                matchLabels:
+                  app.kubernetes.io/name: prometheus
+          ports:
+            - port: 9121
+              protocol: TCP
