@@ -22,7 +22,7 @@ images:
   newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/frontend
   newName: ghcr.io/ricmasetti/online-boutique-platform/frontend
-  newTag: deadbeef0000
+  newTag: dbb2081430a5
 - name: us-central1-docker.pkg.dev/online-boutique-ci/microservices-demo/loadgenerator
   newName: ghcr.io/ricmasetti/online-boutique-platform/loadgenerator
   newTag: dbb2081430a5
