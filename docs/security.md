@@ -7,6 +7,7 @@ Cosa è stato fatto nella fase 3, come è stato verificato e cosa **non** è cop
 | Misura | Dove | Verificato come |
 |---|---|---|
 | Token del service account non montato (`automountServiceAccountToken: false`) su ServiceAccount e pod | [deploy/base/kustomization.yaml](../deploy/base/kustomization.yaml) | I pod risultano con `automountServiceAccountToken: false` e senza volume `kube-api-access`. Prima: nessun servizio usa l'API Kubernetes (nessun client K8s nelle dipendenze di `src/`). |
+| **RBAC: nessun permesso concesso** ai service account dell'applicazione | nessun `Role`, `RoleBinding` o `ClusterRole` nel repository; nessun binding del cluster cita un ServiceAccount di `boutique-*` | Verificato il 2026-11-24: nessun `RoleBinding` o `ClusterRoleBinding` del cluster ha soggetti in `boutique-*`; `kubectl auth can-i` con `--as=system:serviceaccount:boutique-dev:frontend` (e `redis-cart`) risponde `no` a `list pods`, `get`/`list secrets`, `create pods`, `get configmaps`. In prod provato solo il `frontend` e solo `list pods` e `get secrets` (`no`). Resta il diritto di base che ogni utente autenticato ha (discovery e `selfsubject*review`). Permessi minimi = nessuno, perché nessun servizio usa l'API Kubernetes. |
 | ServiceAccount dedicato per `redis-cart` | [deploy/base/redis-serviceaccount.yaml](../deploy/base/redis-serviceaccount.yaml) | Upstream ne definisce 11 (uno per servizio) ma non per Redis. |
 | `seccompProfile: RuntimeDefault` su tutti i pod | base | Presente nei 12 pod; accettato da PSA `restricted`. |
 | Contesto di sicurezza già presente upstream: `runAsNonRoot`, `readOnlyRootFilesystem`, `drop: ALL`, `allowPrivilegeEscalation: false` | `kustomize/base` (non modificato) | Letto nei manifest. Redis gira come `uid=1000`. **Nessuna eccezione** da documentare: tutti i container lo rispettano. |
@@ -66,6 +67,10 @@ Dichiarati apertamente: non sono difetti nascosti, ma confini di ciò che è sta
 - La password è passata come argomento (`--requirepass $(REDIS_PASSWORD)`) e come parte di `REDIS_ADDR` in `cartservice`: i manifest non la contengono, ma è visibile a chi può eseguire comandi nel pod (`ps`, `env`).
 - Nessuna rotazione dei secret. Una sola chiave age serve entrambi gli ambienti: in un caso reale servirebbero chiavi separate per ambiente.
 - Per default k3s non cifra i Secret a riposo in etcd (da verificare nella documentazione di k3s prima di affermarlo nel documento finale). Chi accede al nodo li legge.
+
+**Permessi e RBAC**
+- **Flux ha `cluster-admin`.** `kustomize-controller` e `helm-controller` sono legati a `cluster-admin` (`ClusterRoleBinding cluster-reconciler-flux-system`, verificato il 2026-11-24) e nessuna delle 6 Kustomization usa `serviceAccountName` per limitarsi a un namespace. Quindi **chi può scrivere su `main` o su `prod` può creare qualunque risorsa nel cluster**, non solo nei namespace `boutique-*`. Con «prod solo da PR» che è una convenzione e non un vincolo (nessuna branch protection, [gitops.md](gitops.md) §3), il perimetro reale è l'accesso in scrittura al repository. Non limitato: con un service account per Kustomization e permessi per namespace si ridurrebbe, ma non è stato fatto né provato.
+- Non ci sono `Role` per le persone: l'accesso al cluster è il kubeconfig di k3d, cioè `cluster-admin` per chi ha la macchina. Va bene per un laboratorio locale, non per un cluster condiviso.
 
 **Ambienti e immagini**
 - `dev` e `prod` condividono cluster, nodo e control plane: nessun isolamento reale (ADR 0001). L'isolamento di rete tra i namespace è verificato, quello di risorse no.
