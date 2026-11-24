@@ -127,7 +127,7 @@ Upstream non espone metriche Prometheus, quindi serve una modifica mirata (conse
 
 ### Fase 7 — Stack di osservabilità (M) — Osservabilità 8%
 - [x] `HelmRelease` di kube-prometheus-stack gestito da Flux. _Installato; Grafana saturava la CPU (fino a 4,4 core, 121 riavvii). La PR #10 (senza dashboard predefinite, limite di CPU 1 core) non basta: dopo 25 minuti è tornato al limite quando è stata aperta la pagina delle metriche (circa 130 richieste POST in 2 minuti). A schede chiuse 18-130 mCPU. Causa non provata, correzione ulteriore da decidere (`docs/observability.md` §8)._
-- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy._
+- [x] `ServiceMonitor` per frontend e Redis exporter. _Target `up` in dev; in prod `down` fino alla promozione delle NetworkPolicy; **promosse il 2026-11-24 (PR #23), da allora `up`**._
 - [x] Dashboard Grafana: richieste/s, latenza, errori 5xx, restart pod, stato Redis. _Query verificate con dati reali in dev; la pagina non è stata guardata._
 - [x] 2-3 `PrometheusRule` utili agli scenari di failure (pod in crash loop, 5xx alti, frontend non disponibile). _Quattro regole; con Redis spento in dev sono scattati `RedisDown` e `FrontendHigh5xxRate`. `FrontendUnavailable` e `PodCrashLooping` non esercitate._
 

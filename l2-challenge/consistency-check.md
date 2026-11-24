@@ -78,5 +78,5 @@ Non descrivono questa piattaforma: sono dell'applicazione originale (primi commi
 ## Altre note del controllo
 
 - **Il cluster era in transizione durante il controllo.** Dopo il merge delle PR #11 e #12, `boutique-dev` e `observability-config` sono passate per alcuni minuti in `READY False` («dependency … is not up to date»), poi sono rientrate: normale riconciliazione di Flux a un nuovo commit su `main`, non un guasto. Lo dico perché i numeri di revisione citati nei documenti (`main@649735c2`, `prod@7a723188`) sono una fotografia: oggi `main` è a `6b425017`.
-- **Prod resta a `prod@7a723188`**, indietro rispetto a `main`: non ho aperto la PR di promozione.
+- **Prod era a `prod@7a723188`**, indietro rispetto a `main`, al momento di questo controllo; promosso il 2026-11-24 (PR #23).
 - **La prova da zero con Flux è stata fatta il 2026-11-23, dopo questo controllo** (cluster cancellato e ricreato con `cluster-up.sh` + `flux-bootstrap.sh`; 6 Kustomization `Ready` in circa 3 minuti, 30 pod `Running` con 0 riavvii, smoke test 7/7 in dev e prod). Il rollback di un commit sbagliato è stato provato in dev il 2026-11-24 (runbook §4). Restano anche non provati: il percorso di un altro utente, `netpol-test.sh` sul cluster nuovo e il login a Grafana (verificato solo `/api/health`).
