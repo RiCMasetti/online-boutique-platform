@@ -24,10 +24,16 @@
 # Accesso e traffico:
 #   grafana [--copy|--raw|--open]   URL e credenziali admin di Grafana (dal Secret nel cluster)
 #   load status|up|down|set|stop|start|reset   traffico del loadgenerator (solo dev)
+#   secrets [-A] [--helm]  elenco dei Secret (nome, tipo, chiavi, età), senza valori;
+#                          -A tutti i namespace, --helm include i secret di release Helm
+#   secret <nome> [chiave] [--raw] [--copy]
+#                          legge un Secret decodificato (base64); senza chiave le mostra tutte.
+#                          --raw solo il valore (per pipe), --copy negli appunti. Namespace con -n.
 #
 # Variabili: CONTEXT (default k3d-boutique), HOST_PORT (8080), GRAFANA_NS (monitoring),
 #            LOAD_MAX_USERS (200), KUBE_VERSION per kubeconform (1.33.0, come la CI).
 # Tutti i comandi leggono soltanto, tranne: flux reconcile, load (tranne status), grafana --open/--copy.
+# Attenzione: grafana e secret stampano valori in chiaro nel terminale (usa --copy per evitarlo).
 # Compatibile con bash 3.2 (macOS).
 set -uo pipefail
 
@@ -510,6 +516,88 @@ cmd_grafana() {
   if [ "$open" -eq 1 ]; then need open; open "$url"; fi
 }
 
+# ---------------------------------------------------------------- secrets
+
+# Elenco dei Secret: nome, tipo, chiavi, età. Non stampa mai i valori.
+cmd_secrets() {
+  local all=0 helm=0 a json count hidden
+  for a in "$@"; do
+    case "$a" in
+      -A|--all-namespaces) all=1 ;;
+      --helm) helm=1 ;;
+      *) die "opzione sconosciuta: $a (uso: secrets [-A] [--helm])" ;;
+    esac
+  done
+  if [ "$all" -eq 1 ]; then
+    json="$(k get secrets -A -o json)" || exit 1
+  else
+    json="$(k -n "$NS" get secrets -o json)" || exit 1
+  fi
+  hidden="$(echo "$json" | jq '[.items[] | select(.type == "helm.sh/release.v1")] | length')"
+  count="$(echo "$json" | jq --arg helm "$helm" '[.items[] | select($helm == "1" or .type != "helm.sh/release.v1")] | length')"
+  if [ "$count" -eq 0 ]; then
+    if [ "$all" -eq 1 ]; then echo "Nessun secret nel cluster."; else echo "Nessun secret in $NS."; fi
+  else
+    echo "$json" | jq -r --arg all "$all" --arg helm "$helm" '
+      def age: (now - fromdateiso8601) | floor
+               | if . < 3600 then "\(. / 60 | floor)m" elif . < 86400 then "\(. / 3600 | floor)h" else "\(. / 86400 | floor)d" end;
+      ((if $all == "1" then ["NAMESPACE"] else [] end) + ["NOME", "TIPO", "CHIAVI", "ETA"] | @tsv),
+      (.items[] | select($helm == "1" or .type != "helm.sh/release.v1")
+        | (if $all == "1" then [.metadata.namespace] else [] end)
+          + [.metadata.name, .type, ((.data // {}) | keys | join(",") | if . == "" then "-" else . end), (.metadata.creationTimestamp | age)]
+        | @tsv)' | column -t -s $'\t'
+    echo "(valori: ops.sh -n <namespace> secret <nome> [chiave])"
+  fi
+  if [ "$hidden" -gt 0 ] && [ "$helm" -eq 0 ]; then
+    echo "($hidden secret di release Helm nascosti: aggiungi --helm per vederli)"
+  fi
+}
+
+# Legge un Secret decodificato. Senza chiave stampa tutte le chiavi.
+#   secret <nome> [chiave] [--raw] [--copy]
+cmd_secret() {
+  local name="" key="" raw=0 copy=0 a json keys val
+  for a in "$@"; do
+    case "$a" in
+      --raw) raw=1 ;;
+      --copy) copy=1 ;;
+      -*) die "opzione sconosciuta: $a (uso: secret <nome> [chiave] [--raw] [--copy])" ;;
+      *) if [ -z "$name" ]; then name="$a"; elif [ -z "$key" ]; then key="$a"; else die "troppi argomenti: $a"; fi ;;
+    esac
+  done
+  [ -n "$name" ] || die "uso: ops.sh [-n ns] secret <nome> [chiave] [--raw] [--copy]  (elenco: ops.sh secrets)"
+  if [ "$raw" -eq 1 ] || [ "$copy" -eq 1 ]; then
+    [ -n "$key" ] || die "--raw e --copy richiedono una chiave: ops.sh secret $name <chiave> --raw"
+  fi
+  json="$(k -n "$NS" get secret "$name" -o json 2>/dev/null)" \
+    || die "Secret '$name' non trovato in $NS (elenco: ops.sh -n $NS secrets)"
+  if [ -n "$key" ]; then
+    keys="$(echo "$json" | jq -r '(.data // {}) | keys | join(", ")')"
+    echo "$json" | jq -e --arg key "$key" '(.data // {}) | has($key)' >/dev/null \
+      || die "chiave '$key' assente in $NS/$name (chiavi: ${keys:-nessuna})"
+    val="$(echo "$json" | jq -r --arg key "$key" '.data[$key] | @base64d')"
+    if [ "$copy" -eq 1 ]; then
+      need pbcopy
+      printf '%s' "$val" | pbcopy
+      echo "$NS/$name [$key]: copiato negli appunti"
+    elif [ "$raw" -eq 1 ]; then
+      printf '%s\n' "$val"
+    else
+      echo "Secret $NS/$name  chiave $key"
+      printf '%s\n' "$val"
+    fi
+    return 0
+  fi
+  echo "$json" | jq -r '
+    "Secret \(.metadata.namespace)/\(.metadata.name)  tipo=\(.type)",
+    (if ((.data // {}) | length) == 0 then "(nessun dato)" else empty end),
+    ((.data // {}) | to_entries[]
+      | (.value | try @base64d catch "<binario>") as $v
+      | if ($v | contains("\n"))
+        then "\(.key): |\n" + ($v | rtrimstr("\n") | split("\n") | map("    " + .) | join("\n"))
+        else "\(.key): \($v)" end)'
+}
+
 # ---------------------------------------------------------------- load
 
 need_loadgen() {
@@ -656,7 +744,7 @@ main() {
   local cmd="${1:-}"
   if [ $# -gt 0 ]; then shift; fi
   case "$cmd" in
-    status|top|logs|prev|why|events|restarts|grafana|load|flux|build) "cmd_$cmd" "$@" ;;
+    status|top|logs|prev|why|events|restarts|grafana|load|flux|build|secrets|secret) "cmd_$cmd" "$@" ;;
     "") usage; exit 1 ;;
     *) die "comando sconosciuto: $cmd (vedi: ops.sh help)" ;;
   esac
