@@ -99,6 +99,7 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-18 | 8 | operations | Claude Code | Fase 8: `scripts/break-it.sh` (5 guasti), `docs/runbook.md` | mod. | Tutti i guasti eseguiti e ripristinati in dev con tempi misurati. Un difetto del mio `restore` trovato provando il guasto; rollback GitOps non provato. Dettagli sotto |
 | AI-19 | 9 | analisi | Claude Code | Fase 9: valutazione di Krateo, chart wrapper `krateo/boutique-environment`, ADR 0005 | mod. | Documentazione letta da me/AI dal sito (19 pagine); chart con controlli statici passati; **nulla provato in Krateo**. Dettagli sotto |
 | AI-20 | 10 | documentazione | Claude Code | Fase 10: `l2-challenge/` (README, `ai-usage.md`, `consistency-check.md`), README della radice, correzione di documenti vecchi | mod. | Comandi del README rieseguiti sul cluster (smoke test, `kustomize`+`kubeconform`, `flux get`); prova da zero con Flux fatta in seguito, vedi AI-21. Dettagli sotto |
+| AI-22 | 8 | operations | Claude Code | Prova del rollback GitOps in dev: commit sbagliato (PR #19), `rollout undo` contro Flux, `git revert` (PR #20) | mod. | Misurato; un mio errore di ordine (`flux resume` prima del fetch del revert) ha riapplicato il commit sbagliato. Dettagli sotto |
 | AI-21 | 10 | operations | Claude Code | Cancellazione e ricreazione del cluster k3d con `cluster-up.sh` e `flux-bootstrap.sh` (prova da zero del README, percorso A) | acc. | Kustomization, pod, riavvii, smoke test dev e prod, Grafana `/api/health`, Secret SOPS. Errori miei sotto |
 
 **AI-20, fase 10: documentazione finale (2026-11-23):**
@@ -129,7 +130,7 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 - *Ipotesi del piano confermate dal vivo:* un valore sbagliato non causa crash loop (solo errori 500 con pod `Ready`); un valore assente causa `panic` e `CrashLoopBackOff`.
 - *Osservazione non attesa:* con un rolling update a una replica, tag inesistente, variabile mancante e limite troppo basso **non interrompono il servizio**: il vecchio pod resta. Il segnale e' il rollout bloccato, non un alert di indisponibilita'.
 - *Alert esercitati:* `FrontendHigh5xxRate`, `PodCrashLooping`, `FrontendUnavailable` scattati con i tempi del runbook. Prima delle prove, gli ultimi due erano non esercitati.
-- *Limiti:* i guasti li ho scelti io e conoscevo la risposta, quindi non misurano la qualita' della diagnosi dell'AI; il rollback con `git revert` e `rollout undo` contro Flux **non e' provato**; alert non osservati per `image-tag` e `low-memory`; `CPUThrottlingHigh` su `redis-exporter` in dev notato e non indagato.
+- *Limiti:* i guasti li ho scelti io e conoscevo la risposta, quindi non misurano la qualita' della diagnosi dell'AI; il rollback con `git revert` e `rollout undo` contro Flux non era provato qui; provato dopo, vedi AI-22; alert non osservati per `image-tag` e `low-memory`; `CPUThrottlingHigh` su `redis-exporter` in dev notato e non indagato.
 
 **AI-17, caso di troubleshooting: Grafana in down (2026-11-23):**
 
@@ -326,3 +327,10 @@ _Aggiornare con esempi concreti man mano che emergono._
 | Operations | 8 (AI-02, 04, 07, 13, 15, 17, 18, 21) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
 | Documentazione e demo | 2 (AI-03, 20) | documenti completi nella forma | invecchiano in silenzio e tendono all'ottimismo; checklist della demo non ancora scritta |
 | Governance | 1 (AI-08), più le regole sopra | decisioni mie con opzioni dell'AI; nessun segreto nei prompt | disciplina personale, non imposta da controlli automatici; revisione solo dello stesso strumento |
+
+**AI-22, rollback GitOps in dev (2026-11-24):**
+- *Cosa ha fatto l'AI:* ha proposto la prova, creato il commit sbagliato e il revert come PR, eseguito i comandi e preso i tempi. Ho chiesto io di partire dal rollback.
+- *Verifica:* tempi letti dall'orologio con `kubectl`/`flux get`, smoke test 7/7 a fine prova.
+- *Errore dell'AI:* ha fatto `flux resume` subito dopo il merge, prima del fetch del revert: Flux ha riapplicato il commit sbagliato e ha atteso il timeout di 5 min. L'ho scritto nel runbook come ordine da evitare.
+- *Osservazione non attesa:* dopo `rollout undo` la Kustomization diventa `Ready=True` sulla revisione sbagliata, quindi la divergenza tra Git e cluster non dà alcun segnale fino al giro successivo.
+- *Limiti:* solo dev; prod non provato; alert non osservati.

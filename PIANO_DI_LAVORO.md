@@ -142,7 +142,7 @@ Fase più pesante: dedicale tempo vero.
   - (opzionale) NetworkPolicy troppo restrittiva → timeout tra servizi.
 - [x] Per ciascuno: sintomo, ipotesi, comandi di diagnosi (`get`, `describe`, `logs --previous`, eventi, metriche), causa, fix, verifica. _In `docs/runbook.md` §3. Tempi di diagnosi non misurati in modo onesto: i guasti erano scelti da me._
 - [x] **Caso AI di troubleshooting** (obbligatorio; _AI-17: l'incidente reale di Grafana del 23 novembre, non un guasto costruito_): incolla (senza secret) eventi e log, registra prompt, ipotesi dell'AI, cosa hai verificato, cosa era sbagliato o incompleto.
-- [ ] Rollback GitOps (_documentato in `docs/runbook.md` §4, **non provato**: serve un commit sbagliato su `main`_): `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
+- [x] Rollback GitOps (_provato in dev il 2026-11-24, PR #19/#20, misure in `docs/runbook.md` §4; prod non provato_): `git revert` e riconciliazione Flux. Documenta la differenza con `kubectl rollout undo` e perché Flux lo annullerebbe (serve `flux suspend` prima).
 - [x] `docs/runbook.md`: checklist di verifica, albero di diagnosi, rollback, criteri di escalation.
 
 **Done quando:** puoi rompere e riparare ogni scenario in meno di 5 minuti, spiegando la diagnosi.

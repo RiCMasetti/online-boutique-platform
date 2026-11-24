@@ -113,7 +113,7 @@ Il ripristino di §3 funziona perché **lo stato buono è in Git** e il guasto e
 | | `git revert` + PR | `kubectl rollout undo` |
 |---|---|---|
 | Dove sta la correzione | In Git: Flux la applica | Solo nel cluster |
-| Dura nel tempo | Sì | **No**: al giro successivo di Flux (intervallo 10 min) lo stato di Git, quello sbagliato, torna |
+| Dura nel tempo | Sì | **No**: al giro successivo di Flux (intervallo 10 min; misurati 10 min 20 s) lo stato di Git, quello sbagliato, torna |
 | Traccia e revisione | Commit e PR | Nessuna |
 
 Procedura consigliata:
@@ -124,7 +124,19 @@ Procedura consigliata:
 4. `flux resume kustomization boutique-dev`. **Non dimenticarlo**: una Kustomization sospesa non segnala nulla da sola; `scripts/break-it.sh status` lo mostra.
 5. `scripts/smoke-test.sh` e controllo degli alert.
 
-**Stato della prova.** Provato: che Flux annulla una modifica manuale (fatto dal `restore`) e che non annulla i campi che Git non dichiara (§3.5). **Non provato**: `git revert` di un commit sbagliato già applicato e `rollout undo` annullato da Flux. Sono due prove che richiedono di mettere su `main` un commit volutamente sbagliato; la tabella sopra è il comportamento atteso dalla documentazione di Flux, non una misura.
+**Stato della prova (2026-11-24, solo dev, PR #19 e #20).** Ho messo su `main` un commit volutamente sbagliato (tag inesistente del frontend in `deploy/components/dev-images`, PR #19) e l'ho annullato con `git revert` (PR #20). Misure, con orologio di questa macchina:
+
+| Passo | Esito misurato |
+|---|---|
+| Merge del commit sbagliato → Flux lo applica | circa 40 s. Nuovo pod `ImagePullBackOff`, vecchio pod in servizio, shop `200`: non c'è interruzione, la Kustomization resta «Reconciliation in progress» (`wait: true`, timeout 5 min) |
+| `kubectl rollout undo` **senza** sospendere Flux | il Deployment torna al tag buono subito; la Kustomization diventa `Ready=True` **sulla revisione sbagliata** (i Deployment sono sani, la verifica di salute passa) e Git e cluster divergono senza alcun segnale. Flux ha annullato l'undo dopo 10 min 20 s (intervallo di 10 min dall'ultima applicazione) |
+| `flux suspend` + `rollout undo` | 1 s, il pod buono resta finché Flux è sospesa |
+| `git revert` (PR #20) → merge → `flux resume` | dal merge allo stato buono circa 5 min, **ma per un mio errore di ordine** (vedi sotto) |
+| Smoke test dopo il ripristino | 7/7, 6 Kustomization `Ready` |
+
+**Errore di ordine da evitare.** Ho fatto `flux resume` subito dopo il merge, prima che Flux avesse scaricato il revert: alla ripresa ha riapplicato il commit sbagliato (`851851e6`) e ha dovuto aspettare il timeout di `wait` (5 min) prima di applicare il revert (`300db25b`). Ordine giusto: merge, `flux reconcile source git flux-system`, controllare con `flux get sources git` che la revisione sia quella del revert, **poi** `flux resume` (o `flux reconcile kustomization ... --with-source`). L'ordine corretto non è stato misurato.
+
+**Non provato:** il rollback su prod (PR su `prod`); la Kustomization in stato `Ready=False` dopo il timeout (l'undo l'ha evitato: non ho aspettato i 5 min con il commit sbagliato); gli alert durante la prova non sono stati guardati.
 
 ## 5. Quando passare a qualcun altro
 

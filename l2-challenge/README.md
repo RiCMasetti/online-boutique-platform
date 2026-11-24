@@ -181,7 +181,7 @@ scripts/netpol-test.sh                                         # le NetworkPolic
 | 6 | Health, readiness, log, metriche | [Osservabilità](#osservabilità) |
 | 7 | Aggiornamento e rollout | [sotto](#aggiornamento-promozione-e-rollback) |
 | 8 | Guasto | [Guasti riproducibili](#guasti-riproducibili) |
-| 9 | Rollback | [docs/runbook.md](../docs/runbook.md) §4, **non provato** |
+| 9 | Rollback | [docs/runbook.md](../docs/runbook.md) §4, **provato in dev** (PR #19/#20, 2026-11-24) |
 | 10 | Valutazione Krateo | [docs/krateo-evaluation.md](../docs/krateo-evaluation.md), [ADR 0005](../docs/adr/0005-krateo-non-adottare-ora.md) |
 | 11 | Uso dell'AI | [ai-usage.md](ai-usage.md), [AI-LOG.md](../AI-LOG.md) |
 
@@ -198,7 +198,7 @@ PR main → prod ──► merge ──► Flux ──► prod
 - **dev** segue `main`; **prod** segue il branch `prod`, che avanza solo con una PR `main → prod`: il merge è l'atto di promozione ([ADR 0003](../docs/adr/0003-promozione-prod-via-branch.md)). Oggi «solo con PR» è una convenzione: senza branch protection un push diretto è possibile.
 - La CI non tocca prod. Dopo ogni release serve `git pull`, perché la CI committa il tag su `main`.
 - **Stato di prod:** può essere indietro rispetto a `main` finché non si apre la PR di promozione. Nel cluster al momento della stesura prod è a `prod@7a723188`, indietro rispetto a `main`; i target Prometheus di prod risultano `down` finché le NetworkPolicy aggiornate non vengono promosse ([docs/observability.md](../docs/observability.md) §8).
-- **Rollback corretto:** `git revert` e push (dev) o PR (prod). `kubectl rollout undo` non dura: Flux riporta lo stato di Git. Per un intervento manuale temporaneo serve prima `flux suspend`. **Provato**: il revert di un cambio di repliche in dev (circa 55 s). **Non provato**: il revert di un commit sbagliato su prod e `rollout undo` contro Flux ([docs/runbook.md](../docs/runbook.md) §4).
+- **Rollback corretto:** `git revert` e push (dev) o PR (prod). `kubectl rollout undo` non dura: Flux riporta lo stato di Git. Per un intervento manuale temporaneo serve prima `flux suspend`. **Provato in dev** (2026-11-24): un commit sbagliato (tag inesistente) applicato da Flux in circa 40 s senza interruzione del servizio; `rollout undo` senza sospendere Flux annullato da Flux dopo 10 min 20 s, con la Kustomization `Ready` sulla revisione sbagliata nel frattempo; `git revert` che ripristina, con un mio errore di ordine (`resume` prima del fetch) che ha allungato il ripristino a circa 5 min. **Non provato**: il rollback su prod ([docs/runbook.md](../docs/runbook.md) §4).
 
 ## Osservabilità
 
@@ -247,7 +247,7 @@ Lavora solo su `k3d-boutique` e sul namespace `boutique-dev`. Sospende la Kustom
 | Cluster in esecuzione | 6 Kustomization Flux `Ready`, dev 12/12 pod `Running` il 2026-11-23 |
 | Percorso di un **altro** utente (chiave age, fork, GHCR) | **non provato** |
 | README provato da zero su cluster pulito | **fatto per il percorso A** (2026-11-23, riga sopra); smoke test 7/7 in dev e in prod, Grafana `/api/health` 200, 0 riavvii in `boutique-dev`, `boutique-prod` e `monitoring`. Il percorso B (`apply-local.sh`) non è stato rieseguito oggi (ultima prova 2026-11-19). **Fatto dallo stesso autore, sulla stessa macchina, con la chiave age già presente**: non è la prova di un altro utente |
-| Rollback GitOps di un commit sbagliato | **non provato** |
+| Rollback GitOps di un commit sbagliato | **provato in dev** (2026-11-24); su prod non provato |
 
 Un quadro più dettagliato, comando per comando, è in [consistency-check.md](consistency-check.md).
 
