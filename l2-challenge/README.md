@@ -42,6 +42,8 @@ Come sono mappati i componenti generici della traccia sull'app reale:
 
 **Parti usate:** `src/` (11 servizi) e `kustomize/base`, riusata come base degli overlay. **Parti nostre:** `deploy/`, `clusters/`, `infrastructure/`, `observability/`, `scripts/`, `krateo/`, `.github/workflows/` e il frontend modificato (`/metrics`, [dettagli](../docs/observability.md)). **Parti upstream non usate** da questa piattaforma e rimaste per non toccare la cronologia: `terraform/`, `helm-chart/`, `istio-manifests/`, `kubernetes-manifests/`, `release/`, `skaffold.yaml`, `cloudbuild.yaml`, `.deploystack/` e `kustomize/components/*` tranne `network-policies`. Il `shoppingassistantservice` non è nella base e non è distribuito.
 
+**Documenti upstream non verificati.** In `docs/` restano i documenti del progetto originale di Google: `development-guide.md`, `deploystack.md`, `cloudshell-tutorial.md`, `adding-new-microservice.md`, `product-requirements.md`, `purpose.md`, l'immagine `docs/img/architecture-diagram.png` e `docs/releasing/`. **Non fanno parte della soluzione consegnata e i loro comandi non sono stati eseguiti né adattati a questo repository** (parlano di Google Cloud, Skaffold e GKE): non vanno usati per installare o verificare questa piattaforma. I documenti nostri sono quelli elencati nella [mappa dei documenti](#mappa-dei-documenti).
+
 Analisi completa, diagramma e tabella servizio/protocollo/dipendenze: [docs/architecture.md](../docs/architecture.md).
 
 ## Cosa c'è nel cluster
