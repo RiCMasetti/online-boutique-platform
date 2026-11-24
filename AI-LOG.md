@@ -99,8 +99,9 @@ Obiettivo: 15-25 voci totali, di cui almeno **un caso di troubleshooting approfo
 | AI-18 | 8 | operations | Claude Code | Fase 8: `scripts/break-it.sh` (5 guasti), `docs/runbook.md` | mod. | Tutti i guasti eseguiti e ripristinati in dev con tempi misurati. Un difetto del mio `restore` trovato provando il guasto; rollback GitOps non provato. Dettagli sotto |
 | AI-19 | 9 | analisi | Claude Code | Fase 9: valutazione di Krateo, chart wrapper `krateo/boutique-environment`, ADR 0005 | mod. | Documentazione letta da me/AI dal sito (19 pagine); chart con controlli statici passati; **nulla provato in Krateo**. Dettagli sotto |
 | AI-20 | 10 | documentazione | Claude Code | Fase 10: `l2-challenge/` (README, `ai-usage.md`, `consistency-check.md`), README della radice, correzione di documenti vecchi | mod. | Comandi del README rieseguiti sul cluster (smoke test, `kustomize`+`kubeconform`, `flux get`); prova da zero con Flux fatta in seguito, vedi AI-21. Dettagli sotto |
-| AI-22 | 8 | operations | Claude Code | Prova del rollback GitOps in dev: commit sbagliato (PR #19), `rollout undo` contro Flux, `git revert` (PR #20) | mod. | Misurato; un mio errore di ordine (`flux resume` prima del fetch del revert) ha riapplicato il commit sbagliato. Dettagli sotto |
 | AI-21 | 10 | operations | Claude Code | Cancellazione e ricreazione del cluster k3d con `cluster-up.sh` e `flux-bootstrap.sh` (prova da zero del README, percorso A) | acc. | Kustomization, pod, riavvii, smoke test dev e prod, Grafana `/api/health`, Secret SOPS. Errori miei sotto |
+| AI-22 | 8 | operations | Claude Code | Prova del rollback GitOps in dev: commit sbagliato (PR #19), `rollout undo` contro Flux, `git revert` (PR #20) | mod. | Misurato; un mio errore di ordine (`flux resume` prima del fetch del revert) ha riapplicato il commit sbagliato. Dettagli sotto |
+| AI-23 | 11 | operations | Claude Code | Promozione `main → prod` (PR #23), `docs/demo-checklist.md`, due prove da cluster distrutto, rilettura di `ai-usage.md` | mod. | Misurato in dev e prod; due errori miei (frase sbagliata nella checklist, password di Grafana stampata in output). Dettagli sotto |
 
 **AI-20, fase 10: documentazione finale (2026-11-23):**
 
@@ -324,13 +325,21 @@ _Aggiornare con esempi concreti man mano che emergono._
 |---|---|---|---|
 | Analisi | 4 (AI-01, 05, 06, 19) | lettura rapida di traccia, manifest, codice e documentazione; mappa dei servizi | assunzioni dedotte dal codice smentite dopo (service account, crash loop, `Ping()` del cartservice); Krateo da conoscenza generale finché non verificato |
 | Implementazione | 6 (AI-09, 10, 11, 12, 14, 16) | manifest, script, workflow e modifica al frontend pronti da provare; revisione con `code-review` | bug trovati solo eseguendo (build multi-arch, `kubeconform` e SOPS, `netpol-test.sh`, job `scan` verde ma vuoto) |
-| Operations | 8 (AI-02, 04, 07, 13, 15, 17, 18, 21) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
-| Documentazione e demo | 2 (AI-03, 20) | documenti completi nella forma | invecchiano in silenzio e tendono all'ottimismo; checklist della demo non ancora scritta |
+| Operations | 10 (AI-02, 04, 07, 13, 15, 17, 18, 21, 22, 23) | diagnosi più rapida; prove ripetibili (`break-it.sh`) | «ok» dichiarato prima della prova (Grafana, `restore`); guasti scelti da me, quindi non misurano la diagnosi dell'AI |
+| Documentazione e demo | 2 (AI-03, 20) | documenti completi nella forma | invecchiano in silenzio e tendono all'ottimismo; la checklist della demo (AI-23) è stata scritta dopo le prove, ma una sua frase era sbagliata prima di una mia rilettura, corretta prima del commit |
 | Governance | 1 (AI-08), più le regole sopra | decisioni mie con opzioni dell'AI; nessun segreto nei prompt | disciplina personale, non imposta da controlli automatici; revisione solo dello stesso strumento |
 
 **AI-22, rollback GitOps in dev (2026-11-24):**
 - *Cosa ha fatto l'AI:* ha proposto la prova, creato il commit sbagliato e il revert come PR, eseguito i comandi e preso i tempi. Ho chiesto io di partire dal rollback.
+- *Chi ha eseguito i merge:* le PR #19 e #20 le ha unite Claude Code con `gh pr merge`, dopo il mio via libera al piano («inizia con l'ordine da te suggerito»), non una per una. Un commit sbagliato su `main` osservato da Flux è un'azione che avrei dovuto confermare prima di eseguirla; è contraria alla regola «i merge li faccio io» di `ai-usage.md`.
 - *Verifica:* tempi letti dall'orologio con `kubectl`/`flux get`, smoke test 7/7 a fine prova.
 - *Errore dell'AI:* ha fatto `flux resume` subito dopo il merge, prima del fetch del revert: Flux ha riapplicato il commit sbagliato e ha atteso il timeout di 5 min. L'ho scritto nel runbook come ordine da evitare.
 - *Osservazione non attesa:* dopo `rollout undo` la Kustomization diventa `Ready=True` sulla revisione sbagliata, quindi la divergenza tra Git e cluster non dà alcun segnale fino al giro successivo.
 - *Limiti:* solo dev; prod non provato; alert non osservati.
+
+**AI-23, promozione a prod, checklist della demo, prove da zero (2026-11-24):**
+- *Cosa ha fatto l'AI:* `kustomize build` di prod prima e dopo per vedere cosa cambiava (solo due regole di ingresso per Prometheus), PR `main → prod` (#23) **unita da Claude Code** con `gh pr merge`, dopo il mio «ok procedi» sull'elenco dei passi, non sul merge in sé; due prove complete da cluster distrutto con i tempi; `docs/demo-checklist.md`; rilettura di `ai-usage.md` contro `AI-LOG.md`. I merge delle PR #18, #21 e #22 li ho fatti io.
+- *Verifica:* orologio con `kubectl`/`flux get`; target Prometheus da `/api/v1/targets`, smoke test e `netpol-test.sh` dopo la promozione.
+- *Errori dell'AI:* (1) nella checklist ha scritto che le prove erano state fatte con prod già promosso, mentre erano precedenti alla promozione e con i target di prod `down`: corretto prima del commit, riletto dall'AI e non da un controllo esterno. (2) La password di Grafana è finita nell'output della sessione perché il filtro che doveva nasconderla non funzionava; password di un cluster locale, già documentata. (3) `ai-usage.md` aveva conteggi sbagliati («5 accettate» invece di 6) e diceva che la checklist non esisteva: corretti qui.
+- *Osservazione:* nella seconda prova 3 pod hanno avuto un riavvio per timeout di 1 s della probe di liveness, nella prima nessuno; ipotesi (contesa di CPU all'avvio) non provata.
+- *Limiti:* la prova con la rete staccata non è stata fatta; un cluster ricreato **dopo** la promozione non è stato provato; il ciclo PR → CI → rollout non è stato rimisurato.
